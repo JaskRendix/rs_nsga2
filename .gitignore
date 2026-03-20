@@ -1,0 +1,12 @@
+# Build artifacts
+target/
+Cargo.lock
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Linux
+*.so

@@ -1,0 +1,23 @@
+[package]
+name = "rs_nsga2"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.63"
+authors = ["Giorgio"]
+description = "High-performance NSGA-II solver in Rust."
+license = "MIT"
+repository = "https://github.com/your/repo"
+
+[lib]
+name = "rs_nsga2"
+crate-type = ["rlib"]
+
+[dependencies]
+rayon = "1.8"
+rand = "0.8"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
