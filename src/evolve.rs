@@ -1,4 +1,5 @@
 use crate::data::{crowding_operator, Individual};
+use crate::metrics::hypervolume_2d;
 use crate::problem::Problem;
 use crate::sort::Nsga2Sorter;
 use rand::prelude::*;
@@ -8,8 +9,17 @@ pub struct Evolution<P: Problem> {
     pub problem: P,
     pub population_size: usize,
     pub num_generations: usize,
-    pub crossover_param: f64,
-    pub mutation_param: f64,
+    crossover_param: f64,
+    mutation_param: f64,
+    reference_point: Option<Vec<f64>>,
+    convergence_threshold: Option<(usize, f64)>,
+}
+
+pub struct RunResult {
+    pub pareto_front: Vec<Individual>,
+    pub history: Vec<Vec<Individual>>,
+    pub hypervolume_history: Vec<f64>,
+    pub generations_completed: usize,
 }
 
 impl<P: Problem> Evolution<P> {
@@ -20,17 +30,64 @@ impl<P: Problem> Evolution<P> {
             num_generations,
             crossover_param: 20.0,
             mutation_param: 20.0,
+            reference_point: None,
+            convergence_threshold: None,
         }
     }
 
-    pub fn evolve(&self) -> Vec<Individual> {
+    pub fn with_reference_point(mut self, point: Vec<f64>) -> Self {
+        self.reference_point = Some(point);
+        self
+    }
+
+    pub fn with_crossover_param(mut self, eta: f64) -> Self {
+        assert!(eta > 0.0, "crossover_param must be positive, got {}", eta);
+        self.crossover_param = eta;
+        self
+    }
+
+    pub fn with_mutation_param(mut self, eta: f64) -> Self {
+        assert!(eta > 0.0, "mutation_param must be positive, got {}", eta);
+        self.mutation_param = eta;
+        self
+    }
+
+    pub fn with_convergence_threshold(mut self, window: usize, min_delta: f64) -> Self {
+        assert!(
+            self.reference_point.is_some(),
+            "convergence_threshold requires a reference_point to be set first"
+        );
+        assert!(
+            window >= 2,
+            "convergence window must be >= 2, got {}",
+            window
+        );
+        assert!(
+            min_delta >= 0.0,
+            "min_delta must be >= 0.0, got {}",
+            min_delta
+        );
+        self.convergence_threshold = Some((window, min_delta));
+        self
+    }
+
+    pub fn evolve(&self) -> RunResult {
+        assert!(
+            self.convergence_threshold.is_none() || self.reference_point.is_some(),
+            "convergence_threshold requires a reference_point"
+        );
+
         let mut population = self.initialize_population();
+        let mut history = Vec::with_capacity(self.num_generations);
+        let mut hypervolume_history = Vec::with_capacity(self.num_generations);
 
         for _ in 0..self.num_generations {
             let mut offspring = self.create_offspring(&population);
 
             offspring.par_iter_mut().for_each(|ind| {
                 ind.objectives = self.problem.calculate_objectives(&ind.features);
+                ind.constraint_violations = self.problem.constraint_violations(&ind.features);
+                ind.feasible = ind.constraint_violations.iter().all(|&v| v <= 0.0);
             });
 
             population.extend(offspring);
@@ -57,10 +114,47 @@ impl<P: Problem> Evolution<P> {
             }
 
             population = next;
+
+            let mut snap = population.clone();
+            let fronts = Nsga2Sorter::fast_nondominated_sort(&mut snap);
+            let front_snapshot: Vec<Individual> =
+                fronts[0].iter().map(|&i| snap[i].clone()).collect();
+
+            if let Some(ref ref_point) = self.reference_point {
+                let objectives: Vec<Vec<f64>> = front_snapshot
+                    .iter()
+                    .map(|ind| ind.objectives.clone())
+                    .collect();
+                hypervolume_history.push(hypervolume_2d(&objectives, ref_point));
+            } else {
+                hypervolume_history.push(f64::NAN);
+            }
+
+            history.push(front_snapshot);
+
+            if let Some((window, min_delta)) = self.convergence_threshold {
+                if hypervolume_history.len() >= window {
+                    let recent = &hypervolume_history[hypervolume_history.len() - window..];
+                    let improvement = recent.last().unwrap() - recent.first().unwrap();
+                    if improvement < min_delta {
+                        break;
+                    }
+                }
+            }
         }
 
-        let fronts = Nsga2Sorter::fast_nondominated_sort(&mut population);
-        fronts[0].iter().map(|&i| population[i].clone()).collect()
+        let generations_completed = history.len();
+
+        let mut final_pop = population.clone();
+        let fronts = Nsga2Sorter::fast_nondominated_sort(&mut final_pop);
+        let pareto_front = fronts[0].iter().map(|&i| final_pop[i].clone()).collect();
+
+        RunResult {
+            pareto_front,
+            history,
+            hypervolume_history,
+            generations_completed,
+        }
     }
 
     fn initialize_population(&self) -> Vec<Individual> {
@@ -81,6 +175,13 @@ impl<P: Problem> Evolution<P> {
 
                 let mut ind = Individual::new(features);
                 ind.objectives = self.problem.calculate_objectives(&ind.features);
+                debug_assert_eq!(
+                    ind.objectives.len(),
+                    self.problem.num_objectives(),
+                    "calculate_objectives returned wrong number of objectives"
+                );
+                ind.constraint_violations = self.problem.constraint_violations(&ind.features);
+                ind.feasible = ind.constraint_violations.iter().all(|&v| v <= 0.0);
                 ind
             })
             .collect()
@@ -107,7 +208,12 @@ impl<P: Problem> Evolution<P> {
 
     fn tournament(&self, pop: &[Individual], rng: &mut impl Rng) -> usize {
         let i = rng.gen_range(0..pop.len());
-        let j = rng.gen_range(0..pop.len());
+        let j = loop {
+            let k = rng.gen_range(0..pop.len());
+            if k != i {
+                break k;
+            }
+        };
         match crowding_operator(&pop[i], &pop[j]) {
             std::cmp::Ordering::Less => i,
             _ => j,

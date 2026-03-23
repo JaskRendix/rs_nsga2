@@ -6,7 +6,7 @@ rust-version = "1.63"
 authors = ["Giorgio"]
 description = "High-performance NSGA-II solver in Rust."
 license = "MIT"
-repository = "https://github.com/your/repo"
+repository = "https://github.com/JaskRendix/rs_nsga2"
 
 [lib]
 name = "rs_nsga2"
@@ -21,3 +21,14 @@ opt-level = 3
 lto = true
 codegen-units = 1
 panic = "abort"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "sorting"
+harness = false
+
+[[bench]]
+name = "evolution"
+harness = false

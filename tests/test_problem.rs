@@ -1,3 +1,6 @@
+use rs_nsga2::problem::Problem;
+use rs_nsga2::problem::Schaffer;
+
 #[cfg(test)]
 mod tests {
     use rs_nsga2::problem::{Problem, Schaffer};
@@ -40,4 +43,16 @@ mod tests {
         let p = Schaffer;
         let _ = p.calculate_objectives(&[]);
     }
+}
+#[test]
+fn schaffer_num_objectives_is_two() {
+    let p = Schaffer;
+    assert_eq!(p.num_objectives(), 2);
+}
+
+#[test]
+fn schaffer_objectives_length_matches_num_objectives() {
+    let p = Schaffer;
+    let out = p.calculate_objectives(&[1.0]);
+    assert_eq!(out.len(), p.num_objectives());
 }

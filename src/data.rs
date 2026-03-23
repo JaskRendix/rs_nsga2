@@ -6,6 +6,8 @@ pub struct Individual {
     pub objectives: Vec<f64>,
     pub rank: usize,
     pub crowding_distance: f64,
+    pub feasible: bool,
+    pub constraint_violations: Vec<f64>,
 }
 
 impl Individual {
@@ -15,10 +17,27 @@ impl Individual {
             objectives: Vec::new(),
             rank: 0,
             crowding_distance: 0.0,
+            feasible: true,
+            constraint_violations: Vec::new(),
         }
     }
 
+    pub fn total_violation(&self) -> f64 {
+        self.constraint_violations.iter().map(|&v| v.max(0.0)).sum()
+    }
+
     pub fn dominates(&self, other: &Individual) -> bool {
+        // feasible always dominates infeasible
+        match (self.feasible, other.feasible) {
+            (true, false) => return true,
+            (false, true) => return false,
+            (false, false) => {
+                // both infeasible: lower total violation wins
+                return self.total_violation() < other.total_violation();
+            }
+            (true, true) => {} // fall through to objective comparison
+        }
+
         let mut better_in_one = false;
         for (a, b) in self.objectives.iter().zip(other.objectives.iter()) {
             if a > b {

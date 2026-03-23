@@ -1,34 +1,49 @@
 use crate::data::Individual;
+use rayon::prelude::*;
 
 pub struct Nsga2Sorter;
+
 struct SortState {
     domination_count: i32,
     dominated_indices: Vec<usize>,
 }
+
 impl Nsga2Sorter {
     pub fn fast_nondominated_sort(population: &mut [Individual]) -> Vec<Vec<usize>> {
         let n = population.len();
-        let mut states: Vec<SortState> = (0..n)
-            .map(|_| SortState {
-                domination_count: 0,
-                dominated_indices: Vec::new(),
+
+        // Build domination data in parallel — each row i is independent
+        let states: Vec<SortState> = (0..n)
+            .into_par_iter()
+            .map(|i| {
+                let mut domination_count = 0i32;
+                let mut dominated_indices = Vec::new();
+                for j in 0..n {
+                    if i == j {
+                        continue;
+                    }
+                    if population[i].dominates(&population[j]) {
+                        dominated_indices.push(j);
+                    } else if population[j].dominates(&population[i]) {
+                        domination_count += 1;
+                    }
+                }
+                SortState {
+                    domination_count,
+                    dominated_indices,
+                }
             })
             .collect();
 
+        // Front extraction is sequential — has data dependencies
+        let mut states: Vec<_> = states
+            .into_iter()
+            .map(|s| (s.domination_count, s.dominated_indices))
+            .collect();
         let mut fronts = vec![Vec::new()];
 
         for i in 0..n {
-            for j in 0..n {
-                if i == j {
-                    continue;
-                }
-                if population[i].dominates(&population[j]) {
-                    states[i].dominated_indices.push(j);
-                } else if population[j].dominates(&population[i]) {
-                    states[i].domination_count += 1;
-                }
-            }
-            if states[i].domination_count == 0 {
+            if states[i].0 == 0 {
                 population[i].rank = 0;
                 fronts[0].push(i);
             }
@@ -38,10 +53,10 @@ impl Nsga2Sorter {
         while i < fronts.len() && !fronts[i].is_empty() {
             let mut next = Vec::new();
             for &p in &fronts[i] {
-                let dominated: Vec<usize> = states[p].dominated_indices.clone();
-                for &q in &dominated {
-                    states[q].domination_count -= 1;
-                    if states[q].domination_count == 0 {
+                for qi in 0..states[p].1.len() {
+                    let q = states[p].1[qi];
+                    states[q].0 -= 1;
+                    if states[q].0 == 0 {
                         population[q].rank = i + 1;
                         next.push(q);
                     }
