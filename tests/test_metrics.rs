@@ -1,4 +1,5 @@
 use rs_nsga2::metrics::hypervolume_2d;
+use rs_nsga2::metrics::igd;
 
 #[test]
 fn test_hypervolume_single_point() {
@@ -58,4 +59,63 @@ fn test_hypervolume_nan_when_no_reference_point() {
     for hv in &result.hypervolume_history {
         assert!(hv.is_nan());
     }
+}
+
+#[test]
+#[should_panic(expected = "Reference point must be dominated by all front points")]
+fn test_hypervolume_reference_not_dominating_panics() {
+    let front = vec![vec![5.0, 1.0]];
+    let reference = vec![3.0, 3.0]; // invalid: 5.0 > 3.0
+    hypervolume_2d(&front, &reference);
+}
+
+#[test]
+#[should_panic(expected = "Each point must have 2 objectives")]
+fn test_hypervolume_wrong_dimension_panics() {
+    let front = vec![vec![1.0, 2.0, 3.0]];
+    let reference = vec![5.0, 5.0];
+    hypervolume_2d(&front, &reference);
+}
+
+#[test]
+fn test_hypervolume_ordering_invariant() {
+    let front1 = vec![vec![1.0, 3.0], vec![3.0, 1.0]];
+    let front2 = vec![vec![3.0, 1.0], vec![1.0, 3.0]];
+    let reference = vec![4.0, 4.0];
+
+    let hv1 = hypervolume_2d(&front1, &reference);
+    let hv2 = hypervolume_2d(&front2, &reference);
+
+    assert!((hv1 - hv2).abs() < 1e-12);
+}
+
+#[test]
+fn test_igd_simple() {
+    let true_front = vec![vec![0.0, 0.0]];
+    let obtained = vec![vec![3.0, 4.0]];
+
+    let igd_val = igd(&true_front, &obtained);
+    assert!((igd_val - 5.0).abs() < 1e-12);
+}
+
+#[test]
+fn test_igd_multi_point() {
+    let true_front = vec![vec![0.0, 0.0], vec![1.0, 1.0]];
+    let obtained = vec![vec![0.0, 1.0], vec![1.0, 0.0]];
+
+    // distances:
+    // (0,0) -> min(1,1) = 1
+    // (1,1) -> min(1,1) = 1
+    // IGD = (1+1)/2 = 1
+    let igd_val = igd(&true_front, &obtained);
+    assert!((igd_val - 1.0).abs() < 1e-12);
+}
+
+#[test]
+fn test_igd_empty_returns_nan() {
+    let true_front = vec![vec![1.0, 1.0]];
+    let obtained: Vec<Vec<f64>> = vec![];
+
+    assert!(igd(&true_front, &obtained).is_nan());
+    assert!(igd(&[], &true_front).is_nan());
 }
