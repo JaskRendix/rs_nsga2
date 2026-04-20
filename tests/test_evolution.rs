@@ -185,9 +185,12 @@ fn test_early_stopping_fires_before_max_generations() {
 #[test]
 fn test_generations_completed_matches_history_length() {
     let evo = Evolution::new(Schaffer, 50, 20)
+        .with_seed(123)
         .with_reference_point(vec![10.0, 10.0])
         .with_convergence_threshold(5, 1000.0);
+
     let result = evo.evolve();
+
     assert_eq!(result.generations_completed, result.history.len());
     assert_eq!(
         result.generations_completed,
