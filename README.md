@@ -1,7 +1,7 @@
 # NSGA‑II Rust Core
 
 A Rust implementation of the NSGA‑II multi‑objective evolutionary algorithm.  
-The crate provides the core components needed to build deterministic or stochastic evolutionary workflows.
+The crate provides the core components required to build deterministic or stochastic evolutionary workflows.
 
 ---
 
@@ -17,7 +17,7 @@ The crate provides the core components needed to build deterministic or stochast
 - IGD (Inverted Generational Distance)
 - per‑generation Pareto snapshots
 - early stopping
-- reproducible runs through optional RNG seeding
+- reproducible runs via optional RNG seeding
 
 Objective evaluation and dominance checks run in parallel through Rayon.  
 Algorithm parameters use a builder‑style API.
@@ -29,7 +29,7 @@ Algorithm parameters use a builder‑style API.
 - `problem` — `Problem` trait and built‑in problems  
 - `evolve` — NSGA‑II engine and `RunResult`  
 - `sort` — non‑dominated sorting and crowding distance  
-- `data` — individuals, dominance logic, feasibility rules, crowding operator  
+- `data` — individuals, dominance logic, feasibility rules  
 - `metrics` — strict HV, auto HV, IGD  
 
 ---
@@ -51,27 +51,37 @@ fn main() {
 }
 ```
 
+---
+
 ### Custom problem
 
 ```rust
 use rs_nsga2::evolve::Evolution;
 use rs_nsga2::problem::Problem;
 
-struct MyProblem;
+struct MyProblem {
+    ranges: [(f64, f64); 2],
+}
+
+impl MyProblem {
+    fn new() -> Self {
+        Self {
+            ranges: [(0.0, 1.0), (0.0, 1.0)],
+        }
+    }
+}
 
 impl Problem for MyProblem {
     fn num_variables(&self) -> usize { 2 }
     fn num_objectives(&self) -> usize { 2 }
-    fn variable_ranges(&self) -> &[(f64, f64)] {
-        vec![(0.0, 1.0), (0.0, 1.0)]
-    }
+    fn variable_ranges(&self) -> &[(f64, f64)] { &self.ranges }
     fn calculate_objectives(&self, x: &[f64]) -> Vec<f64> {
         vec![x[0] + x[1], (x[0] - 1.0).powi(2) + (x[1] - 1.0).powi(2)]
     }
 }
 
 fn main() {
-    let result = Evolution::new(MyProblem, 200, 300).evolve();
+    let result = Evolution::new(MyProblem::new(), 200, 300).evolve();
 
     for ind in &result.pareto_front {
         println!("{:?} -> {:?}", ind.features, ind.objectives);
@@ -79,20 +89,30 @@ fn main() {
 }
 ```
 
+---
+
 ### Constrained problem
 
 ```rust
 use rs_nsga2::evolve::Evolution;
 use rs_nsga2::problem::Problem;
 
-struct ConstrainedProblem;
+struct ConstrainedProblem {
+    ranges: [(f64, f64); 2],
+}
+
+impl ConstrainedProblem {
+    fn new() -> Self {
+        Self {
+            ranges: [(0.0, 5.0), (0.0, 5.0)],
+        }
+    }
+}
 
 impl Problem for ConstrainedProblem {
     fn num_variables(&self) -> usize { 2 }
     fn num_objectives(&self) -> usize { 2 }
-    fn variable_ranges(&self) -> &[(f64, f64)] {
-        vec![(0.0, 5.0), (0.0, 5.0)]
-    }
+    fn variable_ranges(&self) -> &[(f64, f64)] { &self.ranges }
     fn calculate_objectives(&self, x: &[f64]) -> Vec<f64> {
         vec![x[0], x[1]]
     }
@@ -102,13 +122,15 @@ impl Problem for ConstrainedProblem {
 }
 
 fn main() {
-    let result = Evolution::new(ConstrainedProblem, 100, 200).evolve();
+    let result = Evolution::new(ConstrainedProblem::new(), 100, 200).evolve();
 
     for ind in &result.pareto_front {
         println!("{:?} -> {:?}", ind.features, ind.objectives);
     }
 }
 ```
+
+---
 
 ### Hypervolume tracking and early stopping
 
@@ -131,6 +153,7 @@ fn main() {
 ## Sorting
 
 ### Non‑dominated sorting
+
 - tri‑state dominance (`IDominatesJ`, `JDominatesI`, `None`)
 - parallel dominance matrix
 - sequential front extraction
@@ -139,9 +162,10 @@ fn main() {
   - among infeasible: lower total violation dominates
 
 ### Crowding distance
-- stable, NaN‑safe sorting per objective
-- infinite distance for boundary individuals
-- finite‑difference distance for interior individuals
+
+- stable, NaN‑safe sorting per objective  
+- infinite distance for boundary individuals  
+- finite‑difference distance for interior individuals  
 
 ---
 
@@ -153,7 +177,7 @@ fn main() {
 use rs_nsga2::metrics::hypervolume_2d_strict;
 ```
 
-Strict HV requires the reference point to dominate the front.
+Reference point must dominate the front.
 
 ### Auto hypervolume
 
@@ -161,7 +185,7 @@ Strict HV requires the reference point to dominate the front.
 use rs_nsga2::metrics::hypervolume_2d_auto;
 ```
 
-Auto HV expands the reference point when needed.
+Reference point is expanded when needed.
 
 ### IGD
 
@@ -193,18 +217,18 @@ Among infeasible solutions, lower total violation dominates.
 ## RunResult
 
 | Field | Description |
-|---|---|
+|-------|-------------|
 | `pareto_front` | final Pareto front |
 | `history` | per‑generation Pareto snapshots |
 | `hypervolume_history` | HV per generation (`NaN` if no reference point) |
 | `igd_history` | IGD per generation (`NaN` if no true front) |
-| `generations_completed` | number of generations executed |
+| `generations_completed` | number of executed generations |
 
 ---
 
 ## Benchmarks
 
-The crate includes:
+Included benchmarks:
 
 - full NSGA‑II loop  
 - sorting only  
