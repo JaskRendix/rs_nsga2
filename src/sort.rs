@@ -3,69 +3,75 @@ use rayon::prelude::*;
 
 pub struct Nsga2Sorter;
 
-struct SortState {
+#[derive(Clone)]
+struct DomInfo {
     domination_count: i32,
-    dominated_indices: Vec<usize>,
+    dominated: Vec<usize>,
 }
 
 impl Nsga2Sorter {
-    pub fn fast_nondominated_sort(population: &mut [Individual]) -> Vec<Vec<usize>> {
-        let n = population.len();
+    pub fn fast_nondominated_sort(pop: &mut [Individual]) -> Vec<Vec<usize>> {
+        let n = pop.len();
 
-        // Build domination data in parallel — each row i is independent
-        let states: Vec<SortState> = (0..n)
+        // Compute domination info in parallel
+        let dom_info: Vec<DomInfo> = (0..n)
             .into_par_iter()
             .map(|i| {
-                let mut domination_count = 0i32;
-                let mut dominated_indices = Vec::new();
+                let mut count = 0;
+                let mut dominated = Vec::new();
+
                 for j in 0..n {
                     if i == j {
                         continue;
                     }
-                    if population[i].dominates(&population[j]) {
-                        dominated_indices.push(j);
-                    } else if population[j].dominates(&population[i]) {
-                        domination_count += 1;
+
+                    match pop[i].dominance_relation(&pop[j]) {
+                        crate::data::DomRelation::IDominatesJ => dominated.push(j),
+                        crate::data::DomRelation::JDominatesI => count += 1,
+                        crate::data::DomRelation::None => {}
                     }
                 }
-                SortState {
-                    domination_count,
-                    dominated_indices,
+
+                DomInfo {
+                    domination_count: count,
+                    dominated,
                 }
             })
             .collect();
 
-        // Front extraction is sequential — has data dependencies
-        let mut states: Vec<_> = states
-            .into_iter()
-            .map(|s| (s.domination_count, s.dominated_indices))
-            .collect();
-        let mut fronts = vec![Vec::new()];
+        // Sequential front extraction
+        let mut dom_info = dom_info;
+        let mut fronts: Vec<Vec<usize>> = vec![Vec::new()];
 
         for i in 0..n {
-            if states[i].0 == 0 {
-                population[i].rank = 0;
+            if dom_info[i].domination_count == 0 {
+                pop[i].rank = 0;
                 fronts[0].push(i);
             }
         }
 
-        let mut i = 0;
-        while i < fronts.len() && !fronts[i].is_empty() {
+        let mut f = 0;
+        while f < fronts.len() && !fronts[f].is_empty() {
             let mut next = Vec::new();
-            for &p in &fronts[i] {
-                for qi in 0..states[p].1.len() {
-                    let q = states[p].1[qi];
-                    states[q].0 -= 1;
-                    if states[q].0 == 0 {
-                        population[q].rank = i + 1;
+
+            for &p in &fronts[f] {
+                // Clone dominated list to avoid overlapping borrows
+                let dominated = dom_info[p].dominated.clone();
+
+                for q in dominated {
+                    dom_info[q].domination_count -= 1;
+                    if dom_info[q].domination_count == 0 {
+                        pop[q].rank = f + 1;
                         next.push(q);
                     }
                 }
             }
+
             if !next.is_empty() {
                 fronts.push(next);
             }
-            i += 1;
+
+            f += 1;
         }
 
         fronts
@@ -88,8 +94,15 @@ impl Nsga2Sorter {
         }
 
         let m = front[0].objectives.len();
+
         for obj in 0..m {
-            front.sort_by(|a, b| a.objectives[obj].partial_cmp(&b.objectives[obj]).unwrap());
+            // Stable, NaN‑safe sort
+            front.sort_by(|a, b| {
+                a.objectives[obj]
+                    .partial_cmp(&b.objectives[obj])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
             front[0].crowding_distance = f64::INFINITY;
             front[n - 1].crowding_distance = f64::INFINITY;
 
