@@ -1,31 +1,35 @@
-# NSGA‑II Rust‑Core
+# NSGA‑II Rust Core
 
-A high‑performance Rust implementation of the NSGA‑II multi‑objective evolutionary algorithm.  
-The crate provides:
+A Rust implementation of the NSGA‑II multi‑objective evolutionary algorithm.  
+The crate provides the core components needed to build deterministic or stochastic evolutionary workflows.
 
-- fast non‑dominated sorting  
-- crowding distance  
-- simulated binary crossover (SBX)  
-- polynomial mutation  
-- tournament selection  
-- constraint handling  
-- strict and auto‑adjusting hypervolume  
-- IGD (Inverted Generational Distance)  
-- per‑generation Pareto snapshots  
-- early stopping  
-- reproducible runs via optional RNG seeding  
+---
+
+## Features
+
+- non‑dominated sorting (parallel dominance matrix, tri‑state dominance)
+- crowding distance (NaN‑safe, stable ordering)
+- simulated binary crossover (SBX)
+- polynomial mutation
+- tournament selection
+- constraint handling
+- strict and auto hypervolume
+- IGD (Inverted Generational Distance)
+- per‑generation Pareto snapshots
+- early stopping
+- reproducible runs through optional RNG seeding
 
 Objective evaluation and dominance checks run in parallel through Rayon.  
-Algorithm parameters are configured through a builder‑style API.
+Algorithm parameters use a builder‑style API.
 
 ---
 
 ## Modules
 
-- `problem` — the `Problem` trait and built‑in problems  
+- `problem` — `Problem` trait and built‑in problems  
 - `evolve` — NSGA‑II engine and `RunResult`  
 - `sort` — non‑dominated sorting and crowding distance  
-- `data` — core data structures  
+- `data` — individuals, dominance logic, feasibility rules, crowding operator  
 - `metrics` — strict HV, auto HV, IGD  
 
 ---
@@ -124,6 +128,23 @@ fn main() {
 
 ---
 
+## Sorting
+
+### Non‑dominated sorting
+- tri‑state dominance (`IDominatesJ`, `JDominatesI`, `None`)
+- parallel dominance matrix
+- sequential front extraction
+- feasibility rules:
+  - feasible dominates infeasible
+  - among infeasible: lower total violation dominates
+
+### Crowding distance
+- stable, NaN‑safe sorting per objective
+- infinite distance for boundary individuals
+- finite‑difference distance for interior individuals
+
+---
+
 ## Metrics
 
 ### Strict hypervolume
@@ -134,26 +155,21 @@ use rs_nsga2::metrics::hypervolume_2d_strict;
 
 Strict HV requires the reference point to dominate the front.
 
-### Auto‑adjusting hypervolume
+### Auto hypervolume
 
 ```rust
 use rs_nsga2::metrics::hypervolume_2d_auto;
 ```
 
-Auto HV expands the reference point minimally to avoid panics.
+Auto HV expands the reference point when needed.
 
 ### IGD
 
 ```rust
 use rs_nsga2::metrics::igd;
-
-fn main() {
-    let true_front = vec![vec![0.0, 1.0], vec![1.0, 0.0]];
-    let obtained = vec![vec![0.1, 0.9], vec![0.8, 0.2]];
-    let d = igd(&true_front, &obtained);
-    println!("IGD: {}", d);
-}
 ```
+
+Computes the average distance from the true front to the obtained front.
 
 ---
 
@@ -161,30 +177,28 @@ fn main() {
 
 Each generation:
 
-1. binary tournament selection  
+1. tournament selection  
 2. SBX crossover  
 3. polynomial mutation  
 4. parallel objective evaluation  
-5. merge parents + offspring  
-6. fast non‑dominated sort  
+5. merge parents and offspring  
+6. non‑dominated sorting  
 7. crowding‑distance truncation  
 
 Feasible solutions dominate infeasible ones.  
-Among infeasible solutions, lower total violation is preferred.
+Among infeasible solutions, lower total violation dominates.
 
 ---
 
 ## RunResult
 
-`evolve()` returns:
-
 | Field | Description |
 |---|---|
-| `pareto_front` | Final Pareto‑optimal solutions |
-| `history` | Per‑generation Pareto front snapshots |
-| `hypervolume_history` | Strict HV per generation (`NaN` if no reference point) |
+| `pareto_front` | final Pareto front |
+| `history` | per‑generation Pareto snapshots |
+| `hypervolume_history` | HV per generation (`NaN` if no reference point) |
 | `igd_history` | IGD per generation (`NaN` if no true front) |
-| `generations_completed` | Actual number of generations run |
+| `generations_completed` | number of generations executed |
 
 ---
 
@@ -192,10 +206,10 @@ Among infeasible solutions, lower total violation is preferred.
 
 The crate includes:
 
-- **evolution** (full NSGA‑II loop)  
-- **sorting‑only** (fast non‑dominated sort)  
-- **strict vs auto hypervolume**  
-- **IGD‑only microbench**  
+- full NSGA‑II loop  
+- sorting only  
+- strict vs auto hypervolume  
+- IGD microbench  
 
 Run all:
 
@@ -211,7 +225,7 @@ cargo bench --bench sorting
 cargo bench --bench evolution
 ```
 
-HTML reports are written to `target/criterion/`.
+Reports are written to `target/criterion/`.
 
 ---
 
