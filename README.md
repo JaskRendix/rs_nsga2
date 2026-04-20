@@ -1,28 +1,39 @@
 # NSGA‑II Rust‑Core
 
-A Rust implementation of the NSGA‑II multi‑objective evolutionary algorithm. The crate provides
-non‑dominated sorting, crowding distance, simulated binary crossover, polynomial mutation, and
-tournament selection. Objective evaluation and dominance comparisons run in parallel through Rayon.
-Constraint handling is supported via the `Problem` trait, where infeasible solutions are
-automatically ranked below feasible ones based on total violation. Per‑generation Pareto front
-snapshots, hypervolume indicator tracking, and convergence‑based early stopping are available
-through `RunResult`. Algorithm parameters are configured through a builder‑style API.
+A high‑performance Rust implementation of the NSGA‑II multi‑objective evolutionary algorithm.  
+The crate provides:
+
+- fast non‑dominated sorting  
+- crowding distance  
+- simulated binary crossover (SBX)  
+- polynomial mutation  
+- tournament selection  
+- constraint handling  
+- strict and auto‑adjusting hypervolume  
+- IGD (Inverted Generational Distance)  
+- per‑generation Pareto snapshots  
+- early stopping  
+- reproducible runs via optional RNG seeding  
+
+Objective evaluation and dominance checks run in parallel through Rayon.  
+Algorithm parameters are configured through a builder‑style API.
 
 ---
 
 ## Modules
 
-- `problem` — the `Problem` trait and built‑in problems
-- `evolve` — the NSGA‑II engine and `RunResult`
-- `sort` — non‑dominated sorting and crowding distance
-- `data` — core data structures
-- `metrics` — hypervolume indicator
+- `problem` — the `Problem` trait and built‑in problems  
+- `evolve` — NSGA‑II engine and `RunResult`  
+- `sort` — non‑dominated sorting and crowding distance  
+- `data` — core data structures  
+- `metrics` — strict HV, auto HV, IGD  
 
 ---
 
 ## Usage
 
 ### Built‑in Schaffer problem
+
 ```rust
 use rs_nsga2::evolve::Evolution;
 use rs_nsga2::problem::Schaffer;
@@ -37,6 +48,7 @@ fn main() {
 ```
 
 ### Custom problem
+
 ```rust
 use rs_nsga2::evolve::Evolution;
 use rs_nsga2::problem::Problem;
@@ -64,6 +76,7 @@ fn main() {
 ```
 
 ### Constrained problem
+
 ```rust
 use rs_nsga2::evolve::Evolution;
 use rs_nsga2::problem::Problem;
@@ -80,8 +93,7 @@ impl Problem for ConstrainedProblem {
         vec![x[0], x[1]]
     }
     fn constraint_violations(&self, x: &[f64]) -> Vec<f64> {
-        // x[0] + x[1] >= 2.0, encoded as 2.0 - x[0] - x[1] <= 0
-        vec![2.0 - x[0] - x[1]]
+        vec![2.0 - x[0] - x[1]] // x0 + x1 >= 2
     }
 }
 
@@ -95,6 +107,7 @@ fn main() {
 ```
 
 ### Hypervolume tracking and early stopping
+
 ```rust
 use rs_nsga2::evolve::Evolution;
 use rs_nsga2::problem::Schaffer;
@@ -106,48 +119,39 @@ fn main() {
         .evolve();
 
     println!("Generations completed: {}", result.generations_completed);
-
-    for (gen, hv) in result.hypervolume_history.iter().enumerate() {
-        println!("Generation {}: hypervolume = {:.4}", gen + 1, hv);
-    }
-
-    for ind in &result.pareto_front {
-        println!("{:?} -> {:?}", ind.features, ind.objectives);
-    }
 }
 ```
 
-### Hypervolume of an arbitrary front
-```rust
-use rs_nsga2::metrics::hypervolume_2d;
+---
 
-fn main() {
-    let front = vec![
-        vec![0.1, 3.9],
-        vec![1.0, 1.0],
-        vec![2.5, 0.5],
-        vec![3.8, 0.1],
-    ];
-    let reference = vec![5.0, 5.0];
-    let hv = hypervolume_2d(&front, &reference);
-    println!("Hypervolume: {:.4}", hv);
-}
+## Metrics
+
+### Strict hypervolume
+
+```rust
+use rs_nsga2::metrics::hypervolume_2d_strict;
 ```
 
-### Custom algorithm parameters
+Strict HV requires the reference point to dominate the front.
+
+### Auto‑adjusting hypervolume
+
 ```rust
-use rs_nsga2::evolve::Evolution;
-use rs_nsga2::problem::Schaffer;
+use rs_nsga2::metrics::hypervolume_2d_auto;
+```
+
+Auto HV expands the reference point minimally to avoid panics.
+
+### IGD
+
+```rust
+use rs_nsga2::metrics::igd;
 
 fn main() {
-    let result = Evolution::new(Schaffer, 100, 300)
-        .with_crossover_param(15.0)
-        .with_mutation_param(10.0)
-        .evolve();
-
-    for ind in &result.pareto_front {
-        println!("{:?} -> {:?}", ind.features, ind.objectives);
-    }
+    let true_front = vec![vec![0.0, 1.0], vec![1.0, 0.0]];
+    let obtained = vec![vec![0.1, 0.9], vec![0.8, 0.2]];
+    let d = igd(&true_front, &obtained);
+    println!("IGD: {}", d);
 }
 ```
 
@@ -155,38 +159,56 @@ fn main() {
 
 ## Algorithm
 
-Each generation applies binary tournament selection, SBX crossover, and polynomial mutation to
-produce offspring. Parent and offspring populations are merged, then reduced to the next generation
-through non‑dominated sorting and crowding distance ranking. Feasibility is tracked per individual
-and incorporated into dominance comparisons — feasible solutions always dominate infeasible ones,
-and among infeasible solutions the one with lower total constraint violation is preferred.
+Each generation:
+
+1. binary tournament selection  
+2. SBX crossover  
+3. polynomial mutation  
+4. parallel objective evaluation  
+5. merge parents + offspring  
+6. fast non‑dominated sort  
+7. crowding‑distance truncation  
+
+Feasible solutions dominate infeasible ones.  
+Among infeasible solutions, lower total violation is preferred.
 
 ---
 
 ## RunResult
 
-`evolve()` returns a `RunResult` containing:
+`evolve()` returns:
 
 | Field | Description |
 |---|---|
 | `pareto_front` | Final Pareto‑optimal solutions |
 | `history` | Per‑generation Pareto front snapshots |
-| `hypervolume_history` | Hypervolume indicator per generation (`NaN` if no reference point set) |
-| `generations_completed` | Number of generations actually run (may be less than `num_generations` if early stopping fired) |
+| `hypervolume_history` | Strict HV per generation (`NaN` if no reference point) |
+| `igd_history` | IGD per generation (`NaN` if no true front) |
+| `generations_completed` | Actual number of generations run |
 
 ---
 
 ## Benchmarks
 
-To measure sorting and evolution performance across population sizes:
+The crate includes:
+
+- **evolution** (full NSGA‑II loop)  
+- **sorting‑only** (fast non‑dominated sort)  
+- **strict vs auto hypervolume**  
+- **IGD‑only microbench**  
+
+Run all:
+
 ```
 cargo bench
 ```
 
-To isolate the impact of parallelisation in `fast_nondominated_sort`:
+Run a specific benchmark:
+
 ```
-RAYON_NUM_THREADS=1 cargo bench --bench sorting
+cargo bench --bench igd
 cargo bench --bench sorting
+cargo bench --bench evolution
 ```
 
 HTML reports are written to `target/criterion/`.
@@ -195,12 +217,10 @@ HTML reports are written to `target/criterion/`.
 
 ## Original authors (Python version)
 
-- Pham Ngo Gia Bao
-- Tram Loi Quan
-- Quan Thanh Tho
-- Akhil Garg
-
----
+- Pham Ngo Gia Bao  
+- Tram Loi Quan  
+- Quan Thanh Tho  
+- Akhil Garg  
 
 ## Rust port
 
