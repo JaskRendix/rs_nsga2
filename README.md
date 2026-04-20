@@ -43,7 +43,7 @@ use rs_nsga2::evolve::Evolution;
 use rs_nsga2::problem::Schaffer;
 
 fn main() {
-    let result = Evolution::new(Schaffer, 100, 500).evolve();
+    let result = Evolution::new(Schaffer::default(), 100, 500).evolve();
 
     for ind in &result.pareto_front {
         println!("{:?} -> {:?}", ind.features, ind.objectives);
@@ -62,7 +62,7 @@ struct MyProblem;
 impl Problem for MyProblem {
     fn num_variables(&self) -> usize { 2 }
     fn num_objectives(&self) -> usize { 2 }
-    fn variable_ranges(&self) -> Vec<(f64, f64)> {
+    fn variable_ranges(&self) -> &[(f64, f64)] {
         vec![(0.0, 1.0), (0.0, 1.0)]
     }
     fn calculate_objectives(&self, x: &[f64]) -> Vec<f64> {
@@ -90,7 +90,7 @@ struct ConstrainedProblem;
 impl Problem for ConstrainedProblem {
     fn num_variables(&self) -> usize { 2 }
     fn num_objectives(&self) -> usize { 2 }
-    fn variable_ranges(&self) -> Vec<(f64, f64)> {
+    fn variable_ranges(&self) -> &[(f64, f64)] {
         vec![(0.0, 5.0), (0.0, 5.0)]
     }
     fn calculate_objectives(&self, x: &[f64]) -> Vec<f64> {
@@ -117,7 +117,7 @@ use rs_nsga2::evolve::Evolution;
 use rs_nsga2::problem::Schaffer;
 
 fn main() {
-    let result = Evolution::new(Schaffer, 100, 500)
+    let result = Evolution::new(Schaffer::default(), 100, 500)
         .with_reference_point(vec![10.0, 10.0])
         .with_convergence_threshold(10, 0.001)
         .evolve();

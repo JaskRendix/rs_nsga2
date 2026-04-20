@@ -31,7 +31,7 @@ fn test_hypervolume_history_length() {
     use rs_nsga2::evolve::Evolution;
     use rs_nsga2::problem::Schaffer;
 
-    let evo = Evolution::new(Schaffer, 50, 10).with_reference_point(vec![100.0, 100.0]);
+    let evo = Evolution::new(Schaffer::default(), 50, 10).with_reference_point(vec![100.0, 100.0]);
     let result = evo.evolve();
     assert_eq!(result.hypervolume_history.len(), 10);
 }
@@ -41,7 +41,7 @@ fn test_hypervolume_history_non_decreasing() {
     use rs_nsga2::evolve::Evolution;
     use rs_nsga2::problem::Schaffer;
 
-    let evo = Evolution::new(Schaffer, 100, 30).with_reference_point(vec![10.0, 10.0]);
+    let evo = Evolution::new(Schaffer::default(), 100, 30).with_reference_point(vec![10.0, 10.0]);
     let result = evo.evolve();
     let hv = &result.hypervolume_history;
     let early: f64 = hv[..5].iter().sum::<f64>() / 5.0;
@@ -54,10 +54,10 @@ fn test_hypervolume_nan_when_no_reference_point() {
     use rs_nsga2::evolve::Evolution;
     use rs_nsga2::problem::Schaffer;
 
-    let evo = Evolution::new(Schaffer, 50, 5);
+    let evo = Evolution::new(Schaffer::default(), 50, 5);
     let result = evo.evolve();
     for hv in &result.hypervolume_history {
-        assert!(hv.is_nan());
+        assert!(f64::is_nan(*hv));
     }
 }
 

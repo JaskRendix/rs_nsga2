@@ -1,17 +1,31 @@
 use rs_nsga2::evolve::Evolution;
 use rs_nsga2::problem::{Problem, Schaffer};
 
-struct DummyProblem;
+struct DummyProblem {
+    ranges: [(f64, f64); 2],
+}
+
+impl DummyProblem {
+    fn new() -> Self {
+        Self {
+            ranges: [(0.0, 1.0), (0.0, 1.0)],
+        }
+    }
+}
+
 impl Problem for DummyProblem {
     fn num_variables(&self) -> usize {
         2
     }
+
     fn num_objectives(&self) -> usize {
         2
     }
-    fn variable_ranges(&self) -> Vec<(f64, f64)> {
-        vec![(0.0, 1.0), (0.0, 1.0)]
+
+    fn variable_ranges(&self) -> &[(f64, f64)] {
+        &self.ranges
     }
+
     fn calculate_objectives(&self, x: &[f64]) -> Vec<f64> {
         vec![x[0] + x[1], x[0] * x[1]]
     }
@@ -19,14 +33,14 @@ impl Problem for DummyProblem {
 
 #[test]
 fn test_evolve_population_size() {
-    let evo = Evolution::new(DummyProblem, 40, 5);
+    let evo = Evolution::new(DummyProblem::new(), 40, 5);
     let result = evo.evolve();
     assert!(result.pareto_front.len() <= 40);
 }
 
 #[test]
 fn test_evolve_respects_bounds() {
-    let evo = Evolution::new(DummyProblem, 40, 5);
+    let evo = Evolution::new(DummyProblem::new(), 40, 5);
     let result = evo.evolve();
     for ind in result.pareto_front {
         assert!(ind.features.len() == 2);
@@ -37,7 +51,7 @@ fn test_evolve_respects_bounds() {
 
 #[test]
 fn test_schaffer_front_is_pareto_optimal() {
-    let evo = Evolution::new(Schaffer, 50, 20)
+    let evo = Evolution::new(Schaffer::default(), 50, 20)
         .with_crossover_param(15.0)
         .with_mutation_param(10.0);
     let result = evo.evolve();
@@ -79,14 +93,14 @@ fn test_schaffer_front_is_pareto_optimal() {
 
 #[test]
 fn test_evolve_odd_population_size() {
-    let evo = Evolution::new(DummyProblem, 41, 5);
+    let evo = Evolution::new(DummyProblem::new(), 41, 5);
     let result = evo.evolve();
     assert!(result.pareto_front.len() <= 42);
 }
 
 #[test]
 fn test_offspring_features_differ_from_parents_sometimes() {
-    let evo = Evolution::new(Schaffer, 50, 20)
+    let evo = Evolution::new(Schaffer::default(), 50, 20)
         .with_crossover_param(15.0)
         .with_mutation_param(10.0);
     let result = evo.evolve();
@@ -100,14 +114,14 @@ fn test_offspring_features_differ_from_parents_sometimes() {
 
 #[test]
 fn test_history_length_matches_generations() {
-    let evo = Evolution::new(DummyProblem, 40, 10);
+    let evo = Evolution::new(DummyProblem::new(), 40, 10);
     let result = evo.evolve();
     assert_eq!(result.history.len(), 10);
 }
 
 #[test]
 fn test_history_fronts_are_non_empty() {
-    let evo = Evolution::new(DummyProblem, 40, 5);
+    let evo = Evolution::new(DummyProblem::new(), 40, 5);
     let result = evo.evolve();
     for snapshot in &result.history {
         assert!(!snapshot.is_empty());
@@ -116,7 +130,7 @@ fn test_history_fronts_are_non_empty() {
 
 #[test]
 fn test_history_last_matches_pareto_front() {
-    let evo = Evolution::new(DummyProblem, 40, 5);
+    let evo = Evolution::new(DummyProblem::new(), 40, 5);
     let result = evo.evolve();
     let last = result.history.last().unwrap();
     assert_eq!(last.len(), result.pareto_front.len());
@@ -124,7 +138,7 @@ fn test_history_last_matches_pareto_front() {
 
 #[test]
 fn test_sbx_children_within_bounds() {
-    let evo = Evolution::new(DummyProblem, 100, 20);
+    let evo = Evolution::new(DummyProblem::new(), 100, 20);
     let result = evo.evolve();
     for ind in &result.pareto_front {
         for &f in &ind.features {
@@ -139,14 +153,14 @@ fn test_sbx_children_within_bounds() {
 
 #[test]
 fn test_custom_crossover_param_produces_valid_front() {
-    let evo = Evolution::new(DummyProblem, 40, 5).with_crossover_param(15.0);
+    let evo = Evolution::new(DummyProblem::new(), 40, 5).with_crossover_param(15.0);
     let result = evo.evolve();
     assert!(!result.pareto_front.is_empty());
 }
 
 #[test]
 fn test_custom_mutation_param_produces_valid_front() {
-    let evo = Evolution::new(DummyProblem, 40, 5).with_mutation_param(10.0);
+    let evo = Evolution::new(DummyProblem::new(), 40, 5).with_mutation_param(10.0);
     let result = evo.evolve();
     assert!(!result.pareto_front.is_empty());
 }
@@ -154,24 +168,24 @@ fn test_custom_mutation_param_produces_valid_front() {
 #[test]
 #[should_panic(expected = "crossover_param must be positive")]
 fn test_invalid_crossover_param_panics() {
-    Evolution::new(DummyProblem, 40, 5).with_crossover_param(-1.0);
+    Evolution::new(DummyProblem::new(), 40, 5).with_crossover_param(-1.0);
 }
 
 #[test]
 #[should_panic(expected = "mutation_param must be positive")]
 fn test_invalid_mutation_param_panics() {
-    Evolution::new(DummyProblem, 40, 5).with_mutation_param(0.0);
+    Evolution::new(DummyProblem::new(), 40, 5).with_mutation_param(0.0);
 }
 #[test]
 fn test_generations_completed_without_early_stopping() {
-    let evo = Evolution::new(DummyProblem, 40, 10).with_reference_point(vec![3.0, 3.0]);
+    let evo = Evolution::new(DummyProblem::new(), 40, 10).with_reference_point(vec![3.0, 3.0]);
     let result = evo.evolve();
     assert_eq!(result.generations_completed, 10);
 }
 
 #[test]
 fn test_early_stopping_fires_before_max_generations() {
-    let evo = Evolution::new(Schaffer, 50, 100)
+    let evo = Evolution::new(Schaffer::default(), 50, 100)
         .with_seed(123)
         .with_reference_point(vec![10.0, 10.0])
         .with_convergence_threshold(5, 1000.0);
@@ -186,7 +200,7 @@ fn test_early_stopping_fires_before_max_generations() {
 
 #[test]
 fn test_generations_completed_matches_history_length() {
-    let evo = Evolution::new(Schaffer, 50, 20)
+    let evo = Evolution::new(Schaffer::default(), 50, 20)
         .with_seed(123)
         .with_reference_point(vec![10.0, 10.0])
         .with_convergence_threshold(5, 1000.0);
@@ -203,13 +217,13 @@ fn test_generations_completed_matches_history_length() {
 #[test]
 #[should_panic(expected = "convergence_threshold requires a reference_point")]
 fn test_convergence_threshold_without_reference_point_panics() {
-    Evolution::new(DummyProblem, 40, 10).with_convergence_threshold(5, 0.01);
+    Evolution::new(DummyProblem::new(), 40, 10).with_convergence_threshold(5, 0.01);
 }
 
 #[test]
 #[should_panic(expected = "convergence window must be >= 2")]
 fn test_convergence_window_too_small_panics() {
-    Evolution::new(DummyProblem, 40, 10)
+    Evolution::new(DummyProblem::new(), 40, 10)
         .with_reference_point(vec![3.0, 3.0])
         .with_convergence_threshold(1, 0.01);
 }
@@ -217,7 +231,7 @@ fn test_convergence_window_too_small_panics() {
 #[test]
 #[should_panic(expected = "min_delta must be >= 0.0")]
 fn test_convergence_negative_delta_panics() {
-    Evolution::new(DummyProblem, 40, 10)
+    Evolution::new(DummyProblem::new(), 40, 10)
         .with_reference_point(vec![3.0, 3.0])
         .with_convergence_threshold(5, -0.01);
 }

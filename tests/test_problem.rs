@@ -7,13 +7,13 @@ mod tests {
 
     #[test]
     fn schaffer_num_variables_is_one() {
-        let p = Schaffer;
+        let p = Schaffer::default();
         assert_eq!(p.num_variables(), 1);
     }
 
     #[test]
     fn schaffer_variable_ranges_are_correct() {
-        let p = Schaffer;
+        let p = Schaffer::default();
         let ranges = p.variable_ranges();
         assert_eq!(ranges.len(), 1);
         assert_eq!(ranges[0], (-55.0, 55.0));
@@ -21,7 +21,7 @@ mod tests {
 
     #[test]
     fn schaffer_objectives_match_definition() {
-        let p = Schaffer;
+        let p = Schaffer::default();
 
         let xs: [f64; 4] = [0.0, 1.0, -3.5, 10.0];
 
@@ -40,19 +40,19 @@ mod tests {
     #[test]
     #[should_panic(expected = "index out of bounds")]
     fn schaffer_panics_on_wrong_input_length() {
-        let p = Schaffer;
+        let p = Schaffer::default();
         let _ = p.calculate_objectives(&[]);
     }
 }
 #[test]
 fn schaffer_num_objectives_is_two() {
-    let p = Schaffer;
+    let p = Schaffer::default();
     assert_eq!(p.num_objectives(), 2);
 }
 
 #[test]
 fn schaffer_objectives_length_matches_num_objectives() {
-    let p = Schaffer;
+    let p = Schaffer::default();
     let out = p.calculate_objectives(&[1.0]);
     assert_eq!(out.len(), p.num_objectives());
 }

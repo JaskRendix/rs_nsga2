@@ -34,7 +34,7 @@ pub struct RunResult {
 impl<P: Problem> Evolution<P> {
     pub fn new(problem: P, population_size: usize, num_generations: usize) -> Self {
         let num_variables = problem.num_variables();
-        let ranges = problem.variable_ranges();
+        let ranges = problem.variable_ranges().to_vec();
 
         Self {
             problem,
