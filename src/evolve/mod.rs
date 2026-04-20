@@ -6,7 +6,7 @@ use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::*;
 
-mod operators;
+pub mod operators;
 use self::operators::{polynomial_mutation, sbx_crossover, tournament};
 
 pub struct Evolution<P: Problem> {

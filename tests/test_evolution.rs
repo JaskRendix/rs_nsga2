@@ -171,11 +171,13 @@ fn test_generations_completed_without_early_stopping() {
 
 #[test]
 fn test_early_stopping_fires_before_max_generations() {
-    // min_delta=1000.0 is impossible to satisfy so it will stop at window
     let evo = Evolution::new(Schaffer, 50, 100)
+        .with_seed(123)
         .with_reference_point(vec![10.0, 10.0])
         .with_convergence_threshold(5, 1000.0);
+
     let result = evo.evolve();
+
     assert!(
         result.generations_completed < 100,
         "Expected early stopping but ran all 100 generations"

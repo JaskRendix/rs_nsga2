@@ -3,8 +3,18 @@ use rand::RngCore;
 
 pub fn tournament(pop: &[Individual], rng: &mut dyn RngCore) -> usize {
     let n = pop.len();
+
+    // Handle degenerate cases
+    if n == 0 {
+        panic!("tournament() called with empty population");
+    }
+    if n == 1 {
+        return 0;
+    }
+
     let i = (rng.next_u64() as usize) % n;
     let mut j = (rng.next_u64() as usize) % n;
+
     while i == j {
         j = (rng.next_u64() as usize) % n;
     }
@@ -61,6 +71,13 @@ pub fn polynomial_mutation(
     let inv = 1.0 / (eta + 1.0);
 
     for (i, &(min, max)) in ranges.iter().enumerate() {
+        // Skip zero-range dimensions (undefined mutation)
+        if (max - min).abs() <= f64::EPSILON {
+            ind.features[i] = min; // keep stable and finite
+            continue;
+        }
+
+        // Mutation probability check
         let rand_prob = (rng.next_u64() as f64) / (u64::MAX as f64);
         if rand_prob > mutation_prob {
             continue;
@@ -68,12 +85,13 @@ pub fn polynomial_mutation(
 
         let x = ind.features[i];
         let u = (rng.next_u64() as f64) / (u64::MAX as f64);
+
         let delta = if u < 0.5 {
-            let bl = ((x - min) / (max - min)).clamp(0.0, 1.0);
+            let bl = (x - min) / (max - min);
             let b = 2.0 * u + (1.0 - 2.0 * u) * (1.0 - bl).powf(eta + 1.0);
             b.powf(inv) - 1.0
         } else {
-            let bu = ((max - x) / (max - min)).clamp(0.0, 1.0);
+            let bu = (max - x) / (max - min);
             let b = 2.0 * (1.0 - u) + 2.0 * (u - 0.5) * (1.0 - bu).powf(eta + 1.0);
             1.0 - b.powf(inv)
         };
