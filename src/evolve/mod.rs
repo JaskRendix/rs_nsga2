@@ -1,10 +1,13 @@
-use crate::data::{crowding_operator, Individual};
+use crate::data::Individual;
 use crate::metrics::{hypervolume_2d, igd};
 use crate::problem::Problem;
 use crate::sort::Nsga2Sorter;
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::*;
+
+mod operators;
+use self::operators::{polynomial_mutation, sbx_crossover, tournament};
 
 pub struct Evolution<P: Problem> {
     pub problem: P,
@@ -16,6 +19,8 @@ pub struct Evolution<P: Problem> {
     true_front: Option<Vec<Vec<f64>>>, // For IGD
     convergence_threshold: Option<(usize, f64)>,
     seed: Option<u64>,
+    num_variables: usize,
+    ranges: Vec<(f64, f64)>,
 }
 
 pub struct RunResult {
@@ -28,6 +33,9 @@ pub struct RunResult {
 
 impl<P: Problem> Evolution<P> {
     pub fn new(problem: P, population_size: usize, num_generations: usize) -> Self {
+        let num_variables = problem.num_variables();
+        let ranges = problem.variable_ranges();
+
         Self {
             problem,
             population_size,
@@ -38,6 +46,8 @@ impl<P: Problem> Evolution<P> {
             true_front: None,
             convergence_threshold: None,
             seed: None,
+            num_variables,
+            ranges,
         }
     }
 
@@ -86,13 +96,13 @@ impl<P: Problem> Evolution<P> {
             None => Box::new(thread_rng()),
         };
 
-        let mut population = self.initialize_population(&mut rng);
+        let mut population = self.initialize_population(&mut *rng);
         let mut history = Vec::with_capacity(self.num_generations);
         let mut hypervolume_history = Vec::with_capacity(self.num_generations);
         let mut igd_history = Vec::with_capacity(self.num_generations);
 
         for _ in 0..self.num_generations {
-            let mut offspring = self.create_offspring(&population, &mut rng);
+            let mut offspring = self.create_offspring(&population, &mut *rng);
 
             // Parallel evaluation
             offspring.par_iter_mut().for_each(|ind| {
@@ -167,7 +177,6 @@ impl<P: Problem> Evolution<P> {
         }
 
         let final_front = history.last().cloned().unwrap_or_default();
-
         let generations_completed = hypervolume_history.len();
 
         RunResult {
@@ -180,15 +189,11 @@ impl<P: Problem> Evolution<P> {
     }
 
     fn initialize_population(&self, rng: &mut dyn RngCore) -> Vec<Individual> {
-        let n = self.problem.num_variables();
-        let ranges = self.problem.variable_ranges();
-
         (0..self.population_size)
             .map(|_| {
-                let features = (0..n)
+                let features = (0..self.num_variables)
                     .map(|i| {
-                        let (min, max) = ranges[i];
-                        // Using a more manual approach since dyn RngCore doesn't have gen_range directly
+                        let (min, max) = self.ranges[i];
                         min + (max - min) * (rng.next_u64() as f64 / u64::MAX as f64)
                     })
                     .collect::<Vec<f64>>();
@@ -204,93 +209,39 @@ impl<P: Problem> Evolution<P> {
 
     fn create_offspring(&self, parents: &[Individual], rng: &mut dyn RngCore) -> Vec<Individual> {
         let mut offspring = Vec::with_capacity(self.population_size);
-        while offspring.len() < self.population_size {
-            let p1 = self.tournament(parents, rng);
-            let p2 = self.tournament(parents, rng);
+        let mutation_prob = 1.0 / self.num_variables as f64;
 
-            let (mut c1, mut c2) = self.sbx_crossover(&parents[p1], &parents[p2], rng);
-            self.polynomial_mutation(&mut c1, rng);
-            self.polynomial_mutation(&mut c2, rng);
+        while offspring.len() < self.population_size {
+            let p1 = tournament(parents, rng);
+            let p2 = tournament(parents, rng);
+
+            let (mut c1, mut c2) = sbx_crossover(
+                &parents[p1],
+                &parents[p2],
+                self.crossover_param,
+                &self.ranges,
+                rng,
+            );
+
+            polynomial_mutation(
+                &mut c1,
+                self.mutation_param,
+                &self.ranges,
+                mutation_prob,
+                rng,
+            );
+            polynomial_mutation(
+                &mut c2,
+                self.mutation_param,
+                &self.ranges,
+                mutation_prob,
+                rng,
+            );
 
             offspring.push(c1);
             offspring.push(c2);
         }
+
         offspring
-    }
-
-    fn tournament(&self, pop: &[Individual], rng: &mut dyn RngCore) -> usize {
-        let n = pop.len();
-        let i = (rng.next_u64() as usize) % n;
-        let mut j = (rng.next_u64() as usize) % n;
-        while i == j {
-            j = (rng.next_u64() as usize) % n;
-        }
-
-        match crowding_operator(&pop[i], &pop[j]) {
-            std::cmp::Ordering::Less => i,
-            _ => j,
-        }
-    }
-
-    fn sbx_crossover(
-        &self,
-        p1: &Individual,
-        p2: &Individual,
-        rng: &mut dyn RngCore,
-    ) -> (Individual, Individual) {
-        let eta = self.crossover_param;
-        let ranges = self.problem.variable_ranges();
-        let mut c1 = Individual::new(p1.features.clone());
-        let mut c2 = Individual::new(p2.features.clone());
-
-        for (i, &(min, max)) in ranges.iter().enumerate() {
-            let x1 = p1.features[i];
-            let x2 = p2.features[i];
-            let rand_val = (rng.next_u64() as f64) / (u64::MAX as f64);
-
-            if rand_val <= 0.5 && (x1 - x2).abs() > f64::EPSILON {
-                let (y1, y2) = if x1 < x2 { (x1, x2) } else { (x2, x1) };
-                let u = (rng.next_u64() as f64) / (u64::MAX as f64);
-                let beta = if u <= 0.5 {
-                    (2.0 * u).powf(1.0 / (eta + 1.0))
-                } else {
-                    (1.0 / (2.0 * (1.0 - u))).powf(1.0 / (eta + 1.0))
-                };
-
-                c1.features[i] = (0.5 * ((y1 + y2) - beta * (y2 - y1))).clamp(min, max);
-                c2.features[i] = (0.5 * ((y1 + y2) + beta * (y2 - y1))).clamp(min, max);
-            } else {
-                c1.features[i] = x1;
-                c2.features[i] = x2;
-            }
-        }
-        (c1, c2)
-    }
-
-    fn polynomial_mutation(&self, ind: &mut Individual, rng: &mut dyn RngCore) {
-        let eta = self.mutation_param;
-        let n = self.problem.num_variables();
-        let ranges = self.problem.variable_ranges();
-        let mutation_prob = 1.0 / n as f64;
-
-        for (i, &(min, max)) in ranges.iter().enumerate() {
-            let rand_prob = (rng.next_u64() as f64) / (u64::MAX as f64);
-            if rand_prob > mutation_prob {
-                continue;
-            }
-
-            let x = ind.features[i];
-            let u = (rng.next_u64() as f64) / (u64::MAX as f64);
-            let delta = if u < 0.5 {
-                let bl = ((x - min) / (max - min)).clamp(0.0, 1.0);
-                let b = 2.0 * u + (1.0 - 2.0 * u) * (1.0 - bl).powf(eta + 1.0);
-                b.powf(1.0 / (eta + 1.0)) - 1.0
-            } else {
-                let bu = ((max - x) / (max - min)).clamp(0.0, 1.0);
-                let b = 2.0 * (1.0 - u) + 2.0 * (u - 0.5) * (1.0 - bu).powf(eta + 1.0);
-                1.0 - b.powf(1.0 / (eta + 1.0))
-            };
-            ind.features[i] = (x + delta * (max - min)).clamp(min, max);
-        }
     }
 }
