@@ -26,11 +26,27 @@ Algorithm parameters use a builder‑style API.
 
 ## Modules
 
-- `problem` — `Problem` trait and built‑in problems  
-- `evolve` — NSGA‑II engine and `RunResult`  
-- `sort` — non‑dominated sorting and crowding distance  
-- `data` — individuals, dominance logic, feasibility rules  
-- `metrics` — strict HV, auto HV, IGD  
+The `problem` module is now split into a directory:
+
+```
+src/problem/
+    problem_trait.rs   — core Problem trait
+    schaffer.rs        — Schaffer N.1
+    zdt.rs             — ZDT1, ZDT2, ZDT3
+    dtlz.rs            — DTLZ1, DTLZ2, DTLZ3
+    kursawe.rs         — Kursawe
+```
+
+All built‑in problems implement the same `Problem` trait and are re‑exported through `problem::`.
+
+Other modules:
+
+- `evolve` — NSGA‑II engine and `RunResult`
+- `sort` — non‑dominated sorting and crowding distance
+- `data` — individuals, dominance logic, feasibility rules
+- `metrics` — strict HV, auto HV, IGD
+
+All tests for Schaffer, ZDT, DTLZ, and Kursawe pass.
 
 ---
 
@@ -53,6 +69,52 @@ fn main() {
 
 ---
 
+### Built‑in ZDT problems
+
+```rust
+use rs_nsga2::evolve::Evolution;
+use rs_nsga2::problem::ZDT1;
+
+fn main() {
+    let result = Evolution::new(ZDT1::new(30), 200, 400).evolve();
+    println!("Front size: {}", result.pareto_front.len());
+}
+```
+
+ZDT2 and ZDT3 follow the same pattern.
+
+---
+
+### Built‑in DTLZ problems
+
+```rust
+use rs_nsga2::evolve::Evolution;
+use rs_nsga2::problem::DTLZ2;
+
+fn main() {
+    let result = Evolution::new(DTLZ2::new(3, 12), 300, 600).evolve();
+    println!("Front size: {}", result.pareto_front.len());
+}
+```
+
+DTLZ1 and DTLZ3 follow the same pattern.
+
+---
+
+### Built‑in Kursawe problem
+
+```rust
+use rs_nsga2::evolve::Evolution;
+use rs_nsga2::problem::Kursawe;
+
+fn main() {
+    let result = Evolution::new(Kursawe::default(), 100, 200).evolve();
+    println!("Front size: {}", result.pareto_front.len());
+}
+```
+
+---
+
 ### Custom problem
 
 ```rust
@@ -65,9 +127,7 @@ struct MyProblem {
 
 impl MyProblem {
     fn new() -> Self {
-        Self {
-            ranges: [(0.0, 1.0), (0.0, 1.0)],
-        }
+        Self { ranges: [(0.0, 1.0), (0.0, 1.0)] }
     }
 }
 
@@ -82,10 +142,7 @@ impl Problem for MyProblem {
 
 fn main() {
     let result = Evolution::new(MyProblem::new(), 200, 300).evolve();
-
-    for ind in &result.pareto_front {
-        println!("{:?} -> {:?}", ind.features, ind.objectives);
-    }
+    println!("Front size: {}", result.pareto_front.len());
 }
 ```
 
@@ -103,9 +160,7 @@ struct ConstrainedProblem {
 
 impl ConstrainedProblem {
     fn new() -> Self {
-        Self {
-            ranges: [(0.0, 5.0), (0.0, 5.0)],
-        }
+        Self { ranges: [(0.0, 5.0), (0.0, 5.0)] }
     }
 }
 
@@ -113,9 +168,7 @@ impl Problem for ConstrainedProblem {
     fn num_variables(&self) -> usize { 2 }
     fn num_objectives(&self) -> usize { 2 }
     fn variable_ranges(&self) -> &[(f64, f64)] { &self.ranges }
-    fn calculate_objectives(&self, x: &[f64]) -> Vec<f64> {
-        vec![x[0], x[1]]
-    }
+    fn calculate_objectives(&self, x: &[f64]) -> Vec<f64> { vec![x[0], x[1]] }
     fn constraint_violations(&self, x: &[f64]) -> Vec<f64> {
         vec![2.0 - x[0] - x[1]] // x0 + x1 >= 2
     }
@@ -123,10 +176,7 @@ impl Problem for ConstrainedProblem {
 
 fn main() {
     let result = Evolution::new(ConstrainedProblem::new(), 100, 200).evolve();
-
-    for ind in &result.pareto_front {
-        println!("{:?} -> {:?}", ind.features, ind.objectives);
-    }
+    println!("Front size: {}", result.pareto_front.len());
 }
 ```
 
