@@ -15,10 +15,12 @@ pub struct Evolution<P: Problem> {
     pub num_generations: usize,
     crossover_param: f64,
     mutation_param: f64,
+    mutation_prob: f64,
     reference_point: Option<Vec<f64>>,
     true_front: Option<Vec<Vec<f64>>>, // For IGD
     convergence_threshold: Option<(usize, f64)>,
     seed: Option<u64>,
+    parallel: bool,
     num_variables: usize,
     ranges: Vec<(f64, f64)>,
 }
@@ -42,10 +44,12 @@ impl<P: Problem> Evolution<P> {
             num_generations,
             crossover_param: 20.0,
             mutation_param: 20.0,
+            mutation_prob: 1.0 / num_variables as f64,
             reference_point: None,
             true_front: None,
             convergence_threshold: None,
             seed: None,
+            parallel: true,
             num_variables,
             ranges,
         }
@@ -78,6 +82,16 @@ impl<P: Problem> Evolution<P> {
         self
     }
 
+    pub fn with_mutation_probability(mut self, prob: f64) -> Self {
+        assert!(
+            (0.0..=1.0).contains(&prob),
+            "mutation probability must be in [0,1], got {}",
+            prob
+        );
+        self.mutation_prob = prob;
+        self
+    }
+
     pub fn with_convergence_threshold(mut self, window: usize, min_delta: f64) -> Self {
         assert!(
             self.reference_point.is_some(),
@@ -90,26 +104,38 @@ impl<P: Problem> Evolution<P> {
         self
     }
 
+    pub fn with_parallel(mut self, parallel: bool) -> Self {
+        self.parallel = parallel;
+        self
+    }
+
     pub fn evolve(&self) -> RunResult {
-        let mut rng: Box<dyn RngCore> = match self.seed {
-            Some(s) => Box::new(ChaCha8Rng::seed_from_u64(s)),
-            None => Box::new(thread_rng()),
+        let mut rng = match self.seed {
+            Some(s) => ChaCha8Rng::seed_from_u64(s),
+            None => {
+                let mut tr = thread_rng();
+                ChaCha8Rng::seed_from_u64(tr.gen::<u64>())
+            }
         };
 
-        let mut population = self.initialize_population(&mut *rng);
+        let mut population = self.initialize_population(&mut rng);
         let mut history = Vec::with_capacity(self.num_generations);
         let mut hypervolume_history = Vec::with_capacity(self.num_generations);
         let mut igd_history = Vec::with_capacity(self.num_generations);
 
         for _ in 0..self.num_generations {
-            let mut offspring = self.create_offspring(&population, &mut *rng);
+            let mut offspring = self.create_offspring(&population, &mut rng);
 
-            // Parallel evaluation
-            offspring.par_iter_mut().for_each(|ind| {
-                ind.objectives = self.problem.calculate_objectives(&ind.features);
-                ind.constraint_violations = self.problem.constraint_violations(&ind.features);
-                ind.feasible = ind.constraint_violations.iter().all(|&v| v <= 0.0);
-            });
+            // Parallel or sequential evaluation
+            if self.parallel {
+                offspring.par_iter_mut().for_each(|ind| {
+                    self.evaluate_individual(ind);
+                });
+            } else {
+                offspring.iter_mut().for_each(|ind| {
+                    self.evaluate_individual(ind);
+                });
+            }
 
             population.extend(offspring);
 
@@ -188,28 +214,33 @@ impl<P: Problem> Evolution<P> {
         }
     }
 
-    fn initialize_population(&self, rng: &mut dyn RngCore) -> Vec<Individual> {
+    #[inline]
+    fn evaluate_individual(&self, ind: &mut Individual) {
+        ind.objectives = self.problem.calculate_objectives(&ind.features);
+        ind.constraint_violations = self.problem.constraint_violations(&ind.features);
+        ind.feasible = ind.constraint_violations.iter().all(|&v| v <= 0.0);
+    }
+
+    fn initialize_population(&self, rng: &mut ChaCha8Rng) -> Vec<Individual> {
         (0..self.population_size)
             .map(|_| {
                 let features = (0..self.num_variables)
                     .map(|i| {
                         let (min, max) = self.ranges[i];
-                        min + (max - min) * (rng.next_u64() as f64 / u64::MAX as f64)
+                        let u: f64 = rng.gen();
+                        min + (max - min) * u
                     })
                     .collect::<Vec<f64>>();
 
                 let mut ind = Individual::new(features);
-                ind.objectives = self.problem.calculate_objectives(&ind.features);
-                ind.constraint_violations = self.problem.constraint_violations(&ind.features);
-                ind.feasible = ind.constraint_violations.iter().all(|&v| v <= 0.0);
+                self.evaluate_individual(&mut ind);
                 ind
             })
             .collect()
     }
 
-    fn create_offspring(&self, parents: &[Individual], rng: &mut dyn RngCore) -> Vec<Individual> {
+    fn create_offspring(&self, parents: &[Individual], rng: &mut ChaCha8Rng) -> Vec<Individual> {
         let mut offspring = Vec::with_capacity(self.population_size);
-        let mutation_prob = 1.0 / self.num_variables as f64;
 
         while offspring.len() < self.population_size {
             let p1 = tournament(parents, rng);
@@ -227,14 +258,14 @@ impl<P: Problem> Evolution<P> {
                 &mut c1,
                 self.mutation_param,
                 &self.ranges,
-                mutation_prob,
+                self.mutation_prob,
                 rng,
             );
             polynomial_mutation(
                 &mut c2,
                 self.mutation_param,
                 &self.ranges,
-                mutation_prob,
+                self.mutation_prob,
                 rng,
             );
 
