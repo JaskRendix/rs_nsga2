@@ -134,3 +134,22 @@ fn test_crowding_distance_zero_range() {
         assert!(!ind.crowding_distance.is_nan());
     }
 }
+
+#[test]
+fn test_sort_handles_constraint_violations() {
+    let mut a = ind(1.0, 1.0);
+    let mut b = ind(2.0, 2.0);
+
+    a.feasible = false;
+    b.feasible = false;
+
+    a.constraint_violations = vec![1.0];
+    b.constraint_violations = vec![5.0];
+
+    let mut pop = vec![a, b];
+    let _fronts = Nsga2Sorter::fast_nondominated_sort(&mut pop);
+
+    // a has lower violation → rank 0
+    assert_eq!(pop[0].rank, 0);
+    assert_eq!(pop[1].rank, 1);
+}
