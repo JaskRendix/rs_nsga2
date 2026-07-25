@@ -1,10 +1,11 @@
 use crate::data::{crowding_operator, Individual};
+use rand::Rng;
 use rand::RngCore;
 
+#[inline]
 pub fn tournament(pop: &[Individual], rng: &mut dyn RngCore) -> usize {
     let n = pop.len();
 
-    // Handle degenerate cases
     if n == 0 {
         panic!("tournament() called with empty population");
     }
@@ -12,11 +13,11 @@ pub fn tournament(pop: &[Individual], rng: &mut dyn RngCore) -> usize {
         return 0;
     }
 
-    let i = (rng.next_u64() as usize) % n;
-    let mut j = (rng.next_u64() as usize) % n;
+    let i = rng.gen::<usize>() % n;
+    let mut j = rng.gen::<usize>() % n;
 
     while i == j {
-        j = (rng.next_u64() as usize) % n;
+        j = rng.gen::<usize>() % n;
     }
 
     match crowding_operator(&pop[i], &pop[j]) {
@@ -25,6 +26,7 @@ pub fn tournament(pop: &[Individual], rng: &mut dyn RngCore) -> usize {
     }
 }
 
+#[inline]
 pub fn sbx_crossover(
     p1: &Individual,
     p2: &Individual,
@@ -39,19 +41,23 @@ pub fn sbx_crossover(
     for (i, &(min, max)) in ranges.iter().enumerate() {
         let x1 = p1.features[i];
         let x2 = p2.features[i];
-        let rand_val = (rng.next_u64() as f64) / (u64::MAX as f64);
+        let rand_val: f64 = rng.gen();
 
         if rand_val <= 0.5 && (x1 - x2).abs() > f64::EPSILON {
             let (y1, y2) = if x1 < x2 { (x1, x2) } else { (x2, x1) };
-            let u = (rng.next_u64() as f64) / (u64::MAX as f64);
+            let u: f64 = rng.gen();
+
             let beta = if u <= 0.5 {
                 (2.0 * u).powf(inv)
             } else {
                 (1.0 / (2.0 * (1.0 - u))).powf(inv)
             };
 
-            c1.features[i] = (0.5 * ((y1 + y2) - beta * (y2 - y1))).clamp(min, max);
-            c2.features[i] = (0.5 * ((y1 + y2) + beta * (y2 - y1))).clamp(min, max);
+            let mid = 0.5 * (y1 + y2);
+            let diff = 0.5 * beta * (y2 - y1);
+
+            c1.features[i] = (mid - diff).clamp(min, max);
+            c2.features[i] = (mid + diff).clamp(min, max);
         } else {
             c1.features[i] = x1;
             c2.features[i] = x2;
@@ -61,6 +67,7 @@ pub fn sbx_crossover(
     (c1, c2)
 }
 
+#[inline]
 pub fn polynomial_mutation(
     ind: &mut Individual,
     eta: f64,
@@ -71,31 +78,33 @@ pub fn polynomial_mutation(
     let inv = 1.0 / (eta + 1.0);
 
     for (i, &(min, max)) in ranges.iter().enumerate() {
-        // Skip zero-range dimensions (undefined mutation)
-        if (max - min).abs() <= f64::EPSILON {
-            ind.features[i] = min; // keep stable and finite
+        let span = max - min;
+
+        // Skip zero-range dimensions
+        if span.abs() <= f64::EPSILON {
+            ind.features[i] = min;
             continue;
         }
 
-        // Mutation probability check
-        let rand_prob = (rng.next_u64() as f64) / (u64::MAX as f64);
-        if rand_prob > mutation_prob {
+        // Mutation probability
+        let u: f64 = rng.gen();
+        if !(0.0..=mutation_prob).contains(&u) {
             continue;
         }
 
         let x = ind.features[i];
-        let u = (rng.next_u64() as f64) / (u64::MAX as f64);
+        let u2: f64 = rng.gen();
 
-        let delta = if u < 0.5 {
-            let bl = (x - min) / (max - min);
-            let b = 2.0 * u + (1.0 - 2.0 * u) * (1.0 - bl).powf(eta + 1.0);
+        let delta = if u2 < 0.5 {
+            let bl = (x - min) / span;
+            let b = 2.0 * u2 + (1.0 - 2.0 * u2) * (1.0 - bl).powf(eta + 1.0);
             b.powf(inv) - 1.0
         } else {
-            let bu = (max - x) / (max - min);
-            let b = 2.0 * (1.0 - u) + 2.0 * (u - 0.5) * (1.0 - bu).powf(eta + 1.0);
+            let bu = (max - x) / span;
+            let b = 2.0 * (1.0 - u2) + 2.0 * (u2 - 0.5) * (1.0 - bu).powf(eta + 1.0);
             1.0 - b.powf(inv)
         };
 
-        ind.features[i] = (x + delta * (max - min)).clamp(min, max);
+        ind.features[i] = (x + delta * span).clamp(min, max);
     }
 }
