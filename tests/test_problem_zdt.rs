@@ -1,8 +1,5 @@
 use rs_nsga2::problem::{Problem, ZDT1, ZDT2, ZDT3};
 
-//
-// ZDT1
-//
 #[test]
 fn zdt1_num_variables_matches_constructor() {
     let p = ZDT1::new(30);
@@ -51,9 +48,6 @@ fn zdt1_objectives_are_finite_for_sample_points() {
     }
 }
 
-//
-// ZDT2
-//
 #[test]
 fn zdt2_num_variables_matches_constructor() {
     let p = ZDT2::new(20);
@@ -102,9 +96,6 @@ fn zdt2_objectives_are_finite_for_sample_points() {
     }
 }
 
-//
-// ZDT3
-//
 #[test]
 fn zdt3_num_variables_matches_constructor() {
     let p = ZDT3::new(10);
@@ -150,5 +141,87 @@ fn zdt3_objectives_are_finite_for_sample_points() {
         let out = p.calculate_objectives(&x);
         assert!(out[0].is_finite());
         assert!(out[1].is_finite());
+    }
+}
+
+#[test]
+fn zdt1_name_and_description_are_correct() {
+    let p = ZDT1::new(5);
+    assert_eq!(p.name(), "ZDT1");
+    assert!(p.description().contains("benchmark"));
+}
+
+#[test]
+fn zdt1_in_place_matches_allocate() {
+    let p = ZDT1::new(4);
+    let x = [0.1, 0.2, 0.3, 0.4];
+
+    let expected = p.calculate_objectives(&x);
+
+    let mut out = vec![0.0; p.num_objectives()];
+    p.calculate_objectives_in_place(&x, &mut out);
+
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn zdt1_repair_solution_clamps_values() {
+    let p = ZDT1::new(4);
+    let mut x = [-1.0, 0.5, 2.0, -0.3];
+
+    p.repair_solution(&mut x);
+
+    for xi in x {
+        assert!((0.0..=1.0).contains(&xi));
+    }
+}
+
+#[test]
+fn zdt2_in_place_matches_allocate() {
+    let p = ZDT2::new(4);
+    let x = [0.2, 0.4, 0.6, 0.8];
+
+    let expected = p.calculate_objectives(&x);
+
+    let mut out = vec![0.0; p.num_objectives()];
+    p.calculate_objectives_in_place(&x, &mut out);
+
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn zdt2_repair_solution_clamps_values() {
+    let p = ZDT2::new(4);
+    let mut x = [-0.5, 1.5, 0.3, 2.0];
+
+    p.repair_solution(&mut x);
+
+    for xi in x {
+        assert!((0.0..=1.0).contains(&xi));
+    }
+}
+
+#[test]
+fn zdt3_in_place_matches_allocate() {
+    let p = ZDT3::new(4);
+    let x = [0.1, 0.2, 0.3, 0.4];
+
+    let expected = p.calculate_objectives(&x);
+
+    let mut out = vec![0.0; p.num_objectives()];
+    p.calculate_objectives_in_place(&x, &mut out);
+
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn zdt3_repair_solution_clamps_values() {
+    let p = ZDT3::new(4);
+    let mut x = [-0.5, 1.5, 0.3, 2.0];
+
+    p.repair_solution(&mut x);
+
+    for xi in x {
+        assert!((0.0..=1.0).contains(&xi));
     }
 }

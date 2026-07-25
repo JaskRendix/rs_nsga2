@@ -1,8 +1,5 @@
 use rs_nsga2::problem::{Problem, DTLZ1, DTLZ2, DTLZ3};
 
-//
-// DTLZ1
-//
 #[test]
 fn dtlz1_num_variables_matches_constructor() {
     let p = DTLZ1::new(3, 7);
@@ -59,9 +56,6 @@ fn dtlz1_panics_on_wrong_input_length() {
     let _ = p.calculate_objectives(&[0.1, 0.2]); // too short
 }
 
-//
-// DTLZ2
-//
 #[test]
 fn dtlz2_num_variables_matches_constructor() {
     let p = DTLZ2::new(3, 10);
@@ -118,9 +112,6 @@ fn dtlz2_panics_on_wrong_input_length() {
     let _ = p.calculate_objectives(&[0.1, 0.2]); // too short
 }
 
-//
-// DTLZ3
-//
 #[test]
 fn dtlz3_num_variables_matches_constructor() {
     let p = DTLZ3::new(3, 9);
@@ -175,4 +166,62 @@ fn dtlz3_objectives_are_finite_for_sample_points() {
 fn dtlz3_panics_on_wrong_input_length() {
     let p = DTLZ3::new(3, 7);
     let _ = p.calculate_objectives(&[0.1, 0.2]); // too short
+}
+
+#[test]
+fn dtlz1_name_and_description_are_correct() {
+    let p = DTLZ1::new(3, 7);
+    assert_eq!(p.name(), "DTLZ1");
+    assert!(p.description().contains("benchmark"));
+}
+
+#[test]
+fn dtlz1_in_place_matches_allocate() {
+    let p = DTLZ1::new(3, 7);
+    let x = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
+
+    let expected = p.calculate_objectives(&x);
+
+    let mut out = vec![0.0; p.num_objectives()];
+    p.calculate_objectives_in_place(&x, &mut out);
+
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn dtlz1_repair_solution_clamps_values() {
+    let p = DTLZ1::new(3, 7);
+    let mut x = [-1.0, 0.5, 2.0, 0.3, 0.7, 1.5, -0.2];
+
+    p.repair_solution(&mut x);
+
+    for xi in x {
+        assert!((0.0..=1.0).contains(&xi));
+    }
+}
+
+#[test]
+fn dtlz2_in_place_matches_allocate() {
+    let p = DTLZ2::new(3, 7);
+    let x = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
+
+    let expected = p.calculate_objectives(&x);
+
+    let mut out = vec![0.0; p.num_objectives()];
+    p.calculate_objectives_in_place(&x, &mut out);
+
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn dtlz3_in_place_matches_allocate() {
+    let p = DTLZ3::new(3, 7);
+    let x = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7];
+
+    let expected = p.calculate_objectives(&x);
+
+    let mut out = vec![0.0; p.num_objectives()];
+    p.calculate_objectives_in_place(&x, &mut out);
+
+    assert_eq!(out, expected);
 }

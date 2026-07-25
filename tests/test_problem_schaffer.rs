@@ -1,6 +1,3 @@
-use rs_nsga2::problem::Problem;
-use rs_nsga2::problem::Schaffer;
-
 #[cfg(test)]
 mod tests {
     use rs_nsga2::problem::{Problem, Schaffer};
@@ -9,6 +6,12 @@ mod tests {
     fn schaffer_num_variables_is_one() {
         let p = Schaffer::default();
         assert_eq!(p.num_variables(), 1);
+    }
+
+    #[test]
+    fn schaffer_num_objectives_is_two() {
+        let p = Schaffer::default();
+        assert_eq!(p.num_objectives(), 2);
     }
 
     #[test]
@@ -43,16 +46,41 @@ mod tests {
         let p = Schaffer::default();
         let _ = p.calculate_objectives(&[]);
     }
-}
-#[test]
-fn schaffer_num_objectives_is_two() {
-    let p = Schaffer::default();
-    assert_eq!(p.num_objectives(), 2);
-}
 
-#[test]
-fn schaffer_objectives_length_matches_num_objectives() {
-    let p = Schaffer::default();
-    let out = p.calculate_objectives(&[1.0]);
-    assert_eq!(out.len(), p.num_objectives());
+    #[test]
+    fn schaffer_objectives_length_matches_num_objectives() {
+        let p = Schaffer::default();
+        let out = p.calculate_objectives(&[1.0]);
+        assert_eq!(out.len(), p.num_objectives());
+    }
+
+    #[test]
+    fn schaffer_name_and_description_are_correct() {
+        let p = Schaffer::default();
+        assert_eq!(p.name(), "Schaffer");
+        assert!(p.description().contains("benchmark"));
+    }
+
+    #[test]
+    fn schaffer_in_place_matches_allocate() {
+        let p = Schaffer::default();
+        let x = [3.7];
+
+        let expected = p.calculate_objectives(&x);
+
+        let mut out = vec![0.0; p.num_objectives()];
+        p.calculate_objectives_in_place(&x, &mut out);
+
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn schaffer_repair_solution_clamps_values() {
+        let p = Schaffer::default();
+        let mut x = [-100.0]; // outside [-55, 55]
+
+        p.repair_solution(&mut x);
+
+        assert!(x[0] >= -55.0 && x[0] <= 55.0);
+    }
 }

@@ -32,6 +32,14 @@ impl DTLZ1 {
 }
 
 impl Problem for DTLZ1 {
+    fn name(&self) -> &'static str {
+        "DTLZ1"
+    }
+
+    fn description(&self) -> &'static str {
+        "Deb–Thiele–Laumanns–Zitzler benchmark problem 1"
+    }
+
     fn num_variables(&self) -> usize {
         self.ranges.len()
     }
@@ -49,17 +57,26 @@ impl Problem for DTLZ1 {
         let mut f = vec![0.5 * (1.0 + g); self.m];
 
         for i in 0..self.m {
-            // multiply over x[0 .. m-i-1]
             for &xj in x.iter().take(self.m - i - 1) {
                 f[i] *= xj;
             }
-
             if i > 0 {
                 f[i] *= 1.0 - x[self.m - i - 1];
             }
         }
 
         f
+    }
+
+    fn calculate_objectives_in_place(&self, x: &[f64], out: &mut [f64]) {
+        let vals = self.calculate_objectives(x);
+        out.copy_from_slice(&vals);
+    }
+
+    fn repair_solution(&self, features: &mut [f64]) {
+        for x in features {
+            *x = x.clamp(0.0, 1.0);
+        }
     }
 }
 
@@ -84,6 +101,14 @@ impl DTLZ2 {
 }
 
 impl Problem for DTLZ2 {
+    fn name(&self) -> &'static str {
+        "DTLZ2"
+    }
+
+    fn description(&self) -> &'static str {
+        "Deb–Thiele–Laumanns–Zitzler benchmark problem 2"
+    }
+
     fn num_variables(&self) -> usize {
         self.ranges.len()
     }
@@ -97,7 +122,6 @@ impl Problem for DTLZ2 {
     }
 
     fn calculate_objectives(&self, x: &[f64]) -> Vec<f64> {
-        // g(x) for DTLZ2 is simpler
         let g = x[x.len() - self.k..]
             .iter()
             .map(|xi| (xi - 0.5).powi(2))
@@ -109,13 +133,23 @@ impl Problem for DTLZ2 {
             for &xj in x.iter().take(self.m - i - 1) {
                 f[i] *= (xj * std::f64::consts::FRAC_PI_2).cos();
             }
-
             if i > 0 {
                 f[i] *= (x[self.m - i - 1] * std::f64::consts::FRAC_PI_2).sin();
             }
         }
 
         f
+    }
+
+    fn calculate_objectives_in_place(&self, x: &[f64], out: &mut [f64]) {
+        let vals = self.calculate_objectives(x);
+        out.copy_from_slice(&vals);
+    }
+
+    fn repair_solution(&self, features: &mut [f64]) {
+        for x in features {
+            *x = x.clamp(0.0, 1.0);
+        }
     }
 }
 
@@ -140,6 +174,14 @@ impl DTLZ3 {
 }
 
 impl Problem for DTLZ3 {
+    fn name(&self) -> &'static str {
+        "DTLZ3"
+    }
+
+    fn description(&self) -> &'static str {
+        "Deb–Thiele–Laumanns–Zitzler benchmark problem 3"
+    }
+
     fn num_variables(&self) -> usize {
         self.ranges.len()
     }
@@ -160,12 +202,22 @@ impl Problem for DTLZ3 {
             for &xj in x.iter().take(self.m - i - 1) {
                 f[i] *= (xj * std::f64::consts::FRAC_PI_2).cos();
             }
-
             if i > 0 {
                 f[i] *= (x[self.m - i - 1] * std::f64::consts::FRAC_PI_2).sin();
             }
         }
 
         f
+    }
+
+    fn calculate_objectives_in_place(&self, x: &[f64], out: &mut [f64]) {
+        let vals = self.calculate_objectives(x);
+        out.copy_from_slice(&vals);
+    }
+
+    fn repair_solution(&self, features: &mut [f64]) {
+        for x in features {
+            *x = x.clamp(0.0, 1.0);
+        }
     }
 }

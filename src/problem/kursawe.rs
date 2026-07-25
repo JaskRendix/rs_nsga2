@@ -13,6 +13,14 @@ impl Default for Kursawe {
 }
 
 impl Problem for Kursawe {
+    fn name(&self) -> &'static str {
+        "Kursawe"
+    }
+
+    fn description(&self) -> &'static str {
+        "Kursawe multiobjective benchmark problem (3 variables, 2 objectives)"
+    }
+
     fn num_variables(&self) -> usize {
         3
     }
@@ -39,5 +47,17 @@ impl Problem for Kursawe {
             .sum::<f64>();
 
         vec![f1, f2]
+    }
+
+    fn calculate_objectives_in_place(&self, x: &[f64], out: &mut [f64]) {
+        let vals = self.calculate_objectives(x);
+        out.copy_from_slice(&vals);
+    }
+
+    fn repair_solution(&self, features: &mut [f64]) {
+        for (i, xi) in features.iter_mut().enumerate() {
+            let (lo, hi) = self.ranges[i];
+            *xi = xi.clamp(lo, hi);
+        }
     }
 }
