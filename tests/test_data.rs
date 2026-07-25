@@ -111,3 +111,59 @@ fn test_crowding_operator_handles_nan_safely() {
     // unwrap_or(Ordering::Equal) means NaN comparisons default to Equal
     assert_eq!(crowding_operator(&a, &b), Ordering::Equal);
 }
+
+#[test]
+fn test_feasible_dominates_infeasible() {
+    let mut a = ind(1.0, 1.0);
+    let mut b = ind(2.0, 2.0);
+
+    a.feasible = true;
+    b.feasible = false;
+
+    assert!(a.dominates(&b));
+    assert_eq!(
+        a.dominance_relation(&b),
+        rs_nsga2::data::DomRelation::IDominatesJ
+    );
+}
+
+#[test]
+fn test_infeasible_loses_to_feasible() {
+    let mut a = ind(1.0, 1.0);
+    let mut b = ind(2.0, 2.0);
+
+    a.feasible = false;
+    b.feasible = true;
+
+    assert!(!a.dominates(&b));
+    assert_eq!(
+        a.dominance_relation(&b),
+        rs_nsga2::data::DomRelation::JDominatesI
+    );
+}
+
+#[test]
+fn test_total_violation_sums_only_positive() {
+    let mut a = ind(1.0, 1.0);
+    a.constraint_violations = vec![-1.0, 0.0, 2.0, -3.0, 5.0];
+
+    assert_eq!(a.total_violation(), 7.0); // 2 + 5
+}
+
+#[test]
+fn test_infeasible_dominance_by_violation() {
+    let mut a = ind(1.0, 1.0);
+    let mut b = ind(2.0, 2.0);
+
+    a.feasible = false;
+    b.feasible = false;
+
+    a.constraint_violations = vec![3.0];
+    b.constraint_violations = vec![10.0];
+
+    assert!(a.dominates(&b));
+    assert_eq!(
+        a.dominance_relation(&b),
+        rs_nsga2::data::DomRelation::IDominatesJ
+    );
+}
