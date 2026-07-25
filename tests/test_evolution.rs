@@ -235,3 +235,23 @@ fn test_convergence_negative_delta_panics() {
         .with_reference_point(vec![3.0, 3.0])
         .with_convergence_threshold(5, -0.01);
 }
+
+#[test]
+fn test_evolve_deterministic_with_seed() {
+    let evo1 = Evolution::new(DummyProblem::new(), 40, 10).with_seed(123);
+    let evo2 = Evolution::new(DummyProblem::new(), 40, 10).with_seed(123);
+
+    let r1 = evo1.evolve();
+    let r2 = evo2.evolve();
+
+    assert_eq!(
+        r1.pareto_front
+            .iter()
+            .map(|i| &i.features)
+            .collect::<Vec<_>>(),
+        r2.pareto_front
+            .iter()
+            .map(|i| &i.features)
+            .collect::<Vec<_>>()
+    );
+}
