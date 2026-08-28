@@ -1,4 +1,4 @@
-use rs_nsga2::data::{crowding_operator, Individual};
+use rs_nsga2::data::{Individual, crowding_operator};
 use std::cmp::Ordering;
 
 fn ind(obj1: f64, obj2: f64) -> Individual {

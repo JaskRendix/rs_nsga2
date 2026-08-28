@@ -1,4 +1,4 @@
-use crate::data::{crowding_operator, Individual};
+use crate::data::{Individual, crowding_operator};
 use rand::Rng;
 use rand::RngCore;
 
@@ -13,11 +13,11 @@ pub fn tournament(pop: &[Individual], rng: &mut dyn RngCore) -> usize {
         return 0;
     }
 
-    let i = rng.gen::<usize>() % n;
-    let mut j = rng.gen::<usize>() % n;
+    let i = rng.r#gen::<usize>() % n;
+    let mut j = rng.r#gen::<usize>() % n;
 
     while i == j {
-        j = rng.gen::<usize>() % n;
+        j = rng.r#gen::<usize>() % n;
     }
 
     match crowding_operator(&pop[i], &pop[j]) {
@@ -41,11 +41,11 @@ pub fn sbx_crossover(
     for (i, &(min, max)) in ranges.iter().enumerate() {
         let x1 = p1.features[i];
         let x2 = p2.features[i];
-        let rand_val: f64 = rng.gen();
+        let rand_val: f64 = rng.r#gen();
 
         if rand_val <= 0.5 && (x1 - x2).abs() > f64::EPSILON {
             let (y1, y2) = if x1 < x2 { (x1, x2) } else { (x2, x1) };
-            let u: f64 = rng.gen();
+            let u: f64 = rng.r#gen();
 
             let beta = if u <= 0.5 {
                 (2.0 * u).powf(inv)
@@ -87,13 +87,13 @@ pub fn polynomial_mutation(
         }
 
         // Mutation probability
-        let u: f64 = rng.gen();
+        let u: f64 = rng.r#gen();
         if !(0.0..=mutation_prob).contains(&u) {
             continue;
         }
 
         let x = ind.features[i];
-        let u2: f64 = rng.gen();
+        let u2: f64 = rng.r#gen();
 
         let delta = if u2 < 0.5 {
             let bl = (x - min) / span;

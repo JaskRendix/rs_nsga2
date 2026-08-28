@@ -1,8 +1,7 @@
 [package]
 name = "rs_nsga2"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.63"
+edition = "2024"
 authors = ["Giorgio"]
 description = "High-performance NSGA-II solver in Rust."
 license = "MIT"

@@ -37,11 +37,7 @@ fn test_tournament_prefers_lower_rank() {
 
     for _ in 0..500 {
         let idx = tournament(&pop, &mut rng);
-        if idx == 0 {
-            count0 += 1
-        } else {
-            count1 += 1
-        }
+        if idx == 0 { count0 += 1 } else { count1 += 1 }
     }
 
     assert!(count0 > count1);

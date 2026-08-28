@@ -114,7 +114,7 @@ impl<P: Problem> Evolution<P> {
             Some(s) => ChaCha8Rng::seed_from_u64(s),
             None => {
                 let mut tr = thread_rng();
-                ChaCha8Rng::seed_from_u64(tr.gen::<u64>())
+                ChaCha8Rng::seed_from_u64(tr.r#gen::<u64>())
             }
         };
 
@@ -192,12 +192,12 @@ impl<P: Problem> Evolution<P> {
             history.push(front_snapshot);
 
             // Early Stopping
-            if let Some((window, min_delta)) = self.convergence_threshold {
-                if hypervolume_history.len() >= window {
-                    let recent = &hypervolume_history[hypervolume_history.len() - window..];
-                    if (recent.last().unwrap() - recent.first().unwrap()).abs() < min_delta {
-                        break;
-                    }
+            if let Some((window, min_delta)) = self.convergence_threshold
+                && hypervolume_history.len() >= window
+            {
+                let recent = &hypervolume_history[hypervolume_history.len() - window..];
+                if (recent.last().unwrap() - recent.first().unwrap()).abs() < min_delta {
+                    break;
                 }
             }
         }
@@ -227,7 +227,7 @@ impl<P: Problem> Evolution<P> {
                 let features = (0..self.num_variables)
                     .map(|i| {
                         let (min, max) = self.ranges[i];
-                        let u: f64 = rng.gen();
+                        let u: f64 = rng.r#gen();
                         min + (max - min) * u
                     })
                     .collect::<Vec<f64>>();

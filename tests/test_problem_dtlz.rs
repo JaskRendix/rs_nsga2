@@ -1,4 +1,4 @@
-use rs_nsga2::problem::{Problem, DTLZ1, DTLZ2, DTLZ3};
+use rs_nsga2::problem::{DTLZ1, DTLZ2, DTLZ3, Problem};
 
 #[test]
 fn dtlz1_num_variables_matches_constructor() {
