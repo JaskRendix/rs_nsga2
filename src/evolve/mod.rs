@@ -6,8 +6,14 @@ use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::*;
 
+pub mod initialization;
+pub mod offspring;
 pub mod operators;
-use self::operators::{polynomial_mutation, sbx_crossover, tournament};
+pub mod selection;
+
+use self::initialization::initialize_population;
+use self::offspring::create_offspring;
+use self::selection::select_next_generation;
 
 pub struct Evolution<P: Problem> {
     pub problem: P,
@@ -119,16 +125,30 @@ impl<P: Problem> Evolution<P> {
             }
         };
 
-        let mut population = self.initialize_population(&mut rng);
+        let mut population = initialize_population(
+            &self.problem,
+            self.population_size,
+            self.num_variables,
+            &self.ranges,
+            &mut rng,
+        );
+
         let mut history = Vec::with_capacity(self.num_generations);
         let mut hypervolume_history = Vec::with_capacity(self.num_generations);
         let mut igd_history = Vec::with_capacity(self.num_generations);
         let mut gd_history = Vec::with_capacity(self.num_generations);
 
         for _ in 0..self.num_generations {
-            let mut offspring = self.create_offspring(&population, &mut rng);
+            let mut offspring = create_offspring(
+                &population,
+                self.population_size,
+                self.crossover_param,
+                self.mutation_param,
+                self.mutation_prob,
+                &self.ranges,
+                &mut rng,
+            );
 
-            // Parallel or sequential evaluation
             if self.parallel {
                 offspring.par_iter_mut().for_each(|ind| {
                     self.evaluate_individual(ind);
@@ -141,39 +161,14 @@ impl<P: Problem> Evolution<P> {
 
             population.extend(offspring);
 
-            // Sort and select next generation
-            let fronts = Nsga2Sorter::fast_nondominated_sort(&mut population);
-
-            // Extract the Rank 0 front for history BEFORE we truncate the population
-            let current_front_indices = &fronts[0];
-            let front_snapshot: Vec<Individual> = current_front_indices
+            let fronts_snapshot = Nsga2Sorter::fast_nondominated_sort(&mut population);
+            let front_snapshot: Vec<Individual> = fronts_snapshot[0]
                 .iter()
                 .map(|&i| population[i].clone())
                 .collect();
 
-            // Truncate population for next gen
-            let mut next = Vec::with_capacity(self.population_size);
-            for front in fronts.into_iter() {
-                if next.len() + front.len() <= self.population_size {
-                    for i in front {
-                        next.push(population[i].clone());
-                    }
-                } else {
-                    let mut last: Vec<_> =
-                        front.into_iter().map(|i| population[i].clone()).collect();
-                    Nsga2Sorter::calculate_crowding_distance(&mut last);
-                    last.sort_unstable_by(|a, b| {
-                        b.crowding_distance
-                            .partial_cmp(&a.crowding_distance)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    });
-                    next.extend(last.into_iter().take(self.population_size - next.len()));
-                    break;
-                }
-            }
-            population = next;
+            population = select_next_generation(&mut population, self.population_size);
 
-            // Metrics Calculation
             let current_objectives: Vec<Vec<f64>> = front_snapshot
                 .iter()
                 .map(|ind| ind.objectives.clone())
@@ -195,7 +190,6 @@ impl<P: Problem> Evolution<P> {
 
             history.push(front_snapshot);
 
-            // Early Stopping
             if let Some((window, min_delta)) = self.convergence_threshold
                 && hypervolume_history.len() >= window
             {
@@ -224,60 +218,5 @@ impl<P: Problem> Evolution<P> {
         ind.objectives = self.problem.calculate_objectives(&ind.features);
         ind.constraint_violations = self.problem.constraint_violations(&ind.features);
         ind.feasible = ind.constraint_violations.iter().all(|&v| v <= 0.0);
-    }
-
-    fn initialize_population(&self, rng: &mut ChaCha8Rng) -> Vec<Individual> {
-        (0..self.population_size)
-            .map(|_| {
-                let features = (0..self.num_variables)
-                    .map(|i| {
-                        let (min, max) = self.ranges[i];
-                        let u: f64 = rng.r#gen();
-                        min + (max - min) * u
-                    })
-                    .collect::<Vec<f64>>();
-
-                let mut ind = Individual::new(features);
-                self.evaluate_individual(&mut ind);
-                ind
-            })
-            .collect()
-    }
-
-    fn create_offspring(&self, parents: &[Individual], rng: &mut ChaCha8Rng) -> Vec<Individual> {
-        let mut offspring = Vec::with_capacity(self.population_size);
-
-        while offspring.len() < self.population_size {
-            let p1 = tournament(parents, rng);
-            let p2 = tournament(parents, rng);
-
-            let (mut c1, mut c2) = sbx_crossover(
-                &parents[p1],
-                &parents[p2],
-                self.crossover_param,
-                &self.ranges,
-                rng,
-            );
-
-            polynomial_mutation(
-                &mut c1,
-                self.mutation_param,
-                &self.ranges,
-                self.mutation_prob,
-                rng,
-            );
-            polynomial_mutation(
-                &mut c2,
-                self.mutation_param,
-                &self.ranges,
-                self.mutation_prob,
-                rng,
-            );
-
-            offspring.push(c1);
-            offspring.push(c2);
-        }
-
-        offspring
     }
 }
