@@ -1,29 +1,33 @@
-**`schaffer_optimization.rs`**
+## **schaffer_optimization.rs**
+**Purpose:** Runs a simple bi‑objective optimization using the classic **Schaffer N.1** benchmark. Useful for validating your setup and learning the default API syntax.  
+**Run:** `cargo run --example schaffer_optimization`
 
-* **What it does:** Runs a quick, basic bi-objective optimization using the classic **Schaffer N.1** test problem. Perfect for verifying your setup and seeing the default API syntax in action.
-* **Run command:** `cargo run --example schaffer_optimization`
+---
 
-**`zdt1_optimization.rs`**
+## **zdt1_optimization.rs**
+**Purpose:** Solves the higher‑dimensional **ZDT1** problem (30 variables) and records strict 2D hypervolume history throughout the run.  
+**Run:** `cargo run --example zdt1_optimization`
 
-* **What it does:** Tackles a higher-dimensional continuous optimization problem using **ZDT1** (30 decision variables) and computes the strict 2D hypervolume history along the way.
-* **Run command:** `cargo run --example zdt1_optimization`
+---
 
-**`custom_problem.rs`**
+## **custom_problem.rs**
+**Purpose:** Shows how to build a fully **custom optimization problem** by implementing the `Problem` trait, defining your own objectives, and specifying variable bounds.  
+**Run:** `cargo run --example custom_problem`
 
-* **What it does:** Walks through building and solving a completely **custom problem** from scratch by implementing the `Problem` trait for your own objective functions and variable ranges.
-* **Run command:** `cargo run --example custom_problem`
+---
 
-**`constrained_problem.rs`**
+## **constrained_problem.rs**
+**Purpose:** Demonstrates constraint handling with a geometric feasibility rule (`x₀ + x₁ ≥ 3.0`). Infeasible solutions are automatically filtered during sorting.  
+**Run:** `cargo run --example constrained_problem`
 
-* **What it does:** Demonstrates **constraint handling** in action by enforcing a strict geometric boundary condition ($x_0 + x_1 \ge 3.0$) and filtering out infeasible solutions automatically during sorting.
-* **Run command:** `cargo run --example constrained_problem`
+---
 
-**`early_stopping.rs`**
+## **early_stopping.rs**
+**Purpose:** Implements convergence‑based **early stopping** using a rolling hypervolume window to halt evolution once progress plateaus.  
+**Run:** `cargo run --example early_stopping`
 
-* **What it does:** Shows how to configure **convergence-based early stopping**, using a rolling hypervolume window to automatically halt the evolution loop once optimization progress plateaus.
-* **Run command:** `cargo run --example early_stopping`
+---
 
-* **`metrics_tracking.rs`**
-
-* **What it does:** Demonstrates how to pass a known true Pareto front using `.with_true_front()` and evaluate optimization accuracy dynamically via **IGD** and **GD** history vectors.
-* **Run command:** `cargo run --example metrics_tracking`
+## **metrics_tracking.rs**
+**Purpose:** Tracks optimization accuracy by providing a known true Pareto front via `.with_true_front()` and computing **IGD** and **GD** metrics over time.  
+**Run:** `cargo run --example metrics_tracking`
