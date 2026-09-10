@@ -11,7 +11,7 @@ jobs:
   rust:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -29,3 +29,12 @@ jobs:
         
       - name: Run tests
         run: cargo test --all --verbose
+
+      - name: Run examples
+        run: |
+          cargo run --example schaffer_optimization
+          cargo run --example zdt1_optimization
+          cargo run --example custom_problem
+          cargo run --example constrained_problem
+          cargo run --example early_stopping
+          cargo run --example metrics_tracking
