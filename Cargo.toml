@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["Giorgio"]
 description = "High-performance NSGA-II solver in Rust."
-license = "MIT"
+license-file = "LICENSE"
 repository = "https://github.com/JaskRendix/rs_nsga2"
 
 [lib]
