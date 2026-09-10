@@ -96,8 +96,8 @@ impl Nsga2Sorter {
         let m = front[0].objectives.len();
 
         for obj in 0..m {
-            // Stable, NaN‑safe sort
-            front.sort_by(|a, b| {
+            // NaN-safe unstable sort for performance optimization
+            front.sort_unstable_by(|a, b| {
                 a.objectives[obj]
                     .partial_cmp(&b.objectives[obj])
                     .unwrap_or(std::cmp::Ordering::Equal)

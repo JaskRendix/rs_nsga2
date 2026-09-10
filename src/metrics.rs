@@ -22,8 +22,8 @@ pub fn hypervolume_2d_strict(front: &[Vec<f64>], reference: &[f64]) -> f64 {
         return 0.0;
     }
 
-    // Deterministic sort with tie-break
-    points.sort_by(|a, b| {
+    // Deterministic unstable sort with tie-break
+    points.sort_unstable_by(|a, b| {
         a.0.partial_cmp(&b.0)
             .unwrap_or(Ordering::Equal)
             .then_with(|| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal))
@@ -78,8 +78,8 @@ pub fn hypervolume_2d_auto(front: &[Vec<f64>], reference: &[f64]) -> f64 {
         }
     }
 
-    // Deterministic sort
-    points.sort_by(|a, b| {
+    // Deterministic unstable sort
+    points.sort_unstable_by(|a, b| {
         a.0.partial_cmp(&b.0)
             .unwrap_or(Ordering::Equal)
             .then_with(|| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal))
@@ -135,4 +135,31 @@ pub fn igd(true_front: &[Vec<f64>], obtained_front: &[Vec<f64>]) -> f64 {
     }
 
     sum_dist / true_front.len() as f64
+}
+
+//
+// GD — GENERATIONAL DISTANCE
+//
+pub fn generational_distance(true_front: &[Vec<f64>], obtained_front: &[Vec<f64>]) -> f64 {
+    if true_front.is_empty() || obtained_front.is_empty() {
+        return f64::NAN;
+    }
+
+    let sum_sq_dist: f64 = obtained_front
+        .iter()
+        .map(|point| {
+            true_front
+                .iter()
+                .map(|target| {
+                    target
+                        .iter()
+                        .zip(point.iter())
+                        .map(|(a, b)| (a - b).powi(2))
+                        .sum::<f64>()
+                })
+                .fold(f64::INFINITY, |a, b| a.min(b))
+        })
+        .sum();
+
+    (sum_sq_dist / obtained_front.len() as f64).sqrt()
 }

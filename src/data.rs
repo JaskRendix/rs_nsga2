@@ -28,28 +28,9 @@ impl Individual {
         self.constraint_violations.iter().map(|&v| v.max(0.0)).sum()
     }
 
-    /// Classic NSGA-II dominance check (boolean)
+    /// Classic NSGA-II dominance check (wrapper around tri-state relation)
     pub fn dominates(&self, other: &Individual) -> bool {
-        // Feasibility rules
-        match (self.feasible, other.feasible) {
-            (true, false) => return true,
-            (false, true) => return false,
-            (false, false) => {
-                return self.total_violation() < other.total_violation();
-            }
-            (true, true) => {}
-        }
-
-        let mut better_in_one = false;
-        for (a, b) in self.objectives.iter().zip(other.objectives.iter()) {
-            if a > b {
-                return false;
-            }
-            if a < b {
-                better_in_one = true;
-            }
-        }
-        better_in_one
+        matches!(self.dominance_relation(other), DomRelation::IDominatesJ)
     }
 }
 
