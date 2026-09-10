@@ -1,6 +1,6 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use rs_nsga2::evolve::Evolution;
-use rs_nsga2::metrics::{hypervolume_2d_auto, hypervolume_2d_strict, igd};
+use rs_nsga2::metrics::{generational_distance, hypervolume_2d_auto, hypervolume_2d_strict, igd};
 use rs_nsga2::problem::Problem;
 use rs_nsga2::sort::Nsga2Sorter;
 
@@ -69,7 +69,37 @@ fn bench_igd_only(c: &mut Criterion) {
 }
 
 //
-// 2. strict vs auto hypervolume
+// 2. GD‑only microbench
+//
+fn bench_gd_only(c: &mut Criterion) {
+    let mut group = c.benchmark_group("gd_only");
+    group.sample_size(10);
+
+    let true_front: Vec<Vec<f64>> = (0..200)
+        .map(|i| {
+            let x = i as f64 / 200.0;
+            vec![x, 1.0 - x]
+        })
+        .collect();
+
+    for &n in &[50, 100, 200, 500] {
+        let obtained: Vec<Vec<f64>> = (0..n)
+            .map(|i| {
+                let x = i as f64 / n as f64;
+                vec![x, 1.0 - x]
+            })
+            .collect();
+
+        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
+            b.iter(|| generational_distance(&true_front, &obtained));
+        });
+    }
+
+    group.finish();
+}
+
+//
+// 3. strict vs auto hypervolume
 //
 fn bench_hv_strict_vs_auto(c: &mut Criterion) {
     let mut group = c.benchmark_group("hypervolume_strict_vs_auto");
@@ -98,7 +128,7 @@ fn bench_hv_strict_vs_auto(c: &mut Criterion) {
 }
 
 //
-// 3. sorting‑only benchmark
+// 4. sorting‑only benchmark
 //
 fn bench_sorting_only(c: &mut Criterion) {
     let mut group = c.benchmark_group("sorting_only");
@@ -125,7 +155,7 @@ fn bench_sorting_only(c: &mut Criterion) {
 }
 
 //
-// 4. evolve_with_igd (your original benchmark)
+// 5. evolve_with_igd
 //
 fn bench_evolve_with_igd(c: &mut Criterion) {
     let mut group = c.benchmark_group("evolve_with_igd");
@@ -154,6 +184,7 @@ fn bench_evolve_with_igd(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_igd_only,
+    bench_gd_only,
     bench_hv_strict_vs_auto,
     bench_sorting_only,
     bench_evolve_with_igd
