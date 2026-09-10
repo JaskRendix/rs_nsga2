@@ -1,3 +1,4 @@
+use rs_nsga2::metrics::generational_distance;
 use rs_nsga2::metrics::hypervolume_2d;
 use rs_nsga2::metrics::hypervolume_2d_auto;
 use rs_nsga2::metrics::igd;
@@ -194,4 +195,43 @@ fn test_igd_empty_returns_nan() {
 
     assert!(igd(&true_front, &obtained).is_nan());
     assert!(igd(&[], &true_front).is_nan());
+}
+
+#[test]
+fn test_gd_simple() {
+    let true_front = vec![vec![0.0, 0.0]];
+    let obtained = vec![vec![3.0, 4.0]];
+
+    let gd_val = generational_distance(&true_front, &obtained);
+    assert!((gd_val - 5.0).abs() < 1e-12);
+}
+
+#[test]
+fn test_gd_perfect_match() {
+    let true_front = vec![vec![0.0, 0.0], vec![1.0, 1.0]];
+    let obtained = vec![vec![0.0, 0.0], vec![1.0, 1.0]];
+
+    let gd_val = generational_distance(&true_front, &obtained);
+    assert!(gd_val.abs() < 1e-12);
+}
+
+#[test]
+fn test_gd_multi_point() {
+    let true_front = vec![vec![0.0, 0.0]];
+    let obtained = vec![vec![3.0, 4.0], vec![6.0, 8.0]];
+
+    // Squared distances: 25.0 and 100.0
+    // Sum = 125.0, Mean = 62.5, Sqrt(62.5) ≈ 7.90569415042
+    let gd_val = generational_distance(&true_front, &obtained);
+    let expected = (62.5f64).sqrt();
+    assert!((gd_val - expected).abs() < 1e-12);
+}
+
+#[test]
+fn test_gd_empty_returns_nan() {
+    let true_front = vec![vec![1.0, 1.0]];
+    let obtained: Vec<Vec<f64>> = vec![];
+
+    assert!(generational_distance(&true_front, &obtained).is_nan());
+    assert!(generational_distance(&[], &true_front).is_nan());
 }
