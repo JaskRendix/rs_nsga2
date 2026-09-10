@@ -1,5 +1,5 @@
 use crate::data::Individual;
-use crate::metrics::{hypervolume_2d, igd};
+use crate::metrics::{generational_distance, hypervolume_2d, igd};
 use crate::problem::Problem;
 use crate::sort::Nsga2Sorter;
 use rand::prelude::*;
@@ -17,7 +17,7 @@ pub struct Evolution<P: Problem> {
     mutation_param: f64,
     mutation_prob: f64,
     reference_point: Option<Vec<f64>>,
-    true_front: Option<Vec<Vec<f64>>>, // For IGD
+    true_front: Option<Vec<Vec<f64>>>, // For IGD and GD
     convergence_threshold: Option<(usize, f64)>,
     seed: Option<u64>,
     parallel: bool,
@@ -30,6 +30,7 @@ pub struct RunResult {
     pub history: Vec<Vec<Individual>>,
     pub hypervolume_history: Vec<f64>,
     pub igd_history: Vec<f64>,
+    pub gd_history: Vec<f64>,
     pub generations_completed: usize,
 }
 
@@ -122,6 +123,7 @@ impl<P: Problem> Evolution<P> {
         let mut history = Vec::with_capacity(self.num_generations);
         let mut hypervolume_history = Vec::with_capacity(self.num_generations);
         let mut igd_history = Vec::with_capacity(self.num_generations);
+        let mut gd_history = Vec::with_capacity(self.num_generations);
 
         for _ in 0..self.num_generations {
             let mut offspring = self.create_offspring(&population, &mut rng);
@@ -160,7 +162,7 @@ impl<P: Problem> Evolution<P> {
                     let mut last: Vec<_> =
                         front.into_iter().map(|i| population[i].clone()).collect();
                     Nsga2Sorter::calculate_crowding_distance(&mut last);
-                    last.sort_by(|a, b| {
+                    last.sort_unstable_by(|a, b| {
                         b.crowding_distance
                             .partial_cmp(&a.crowding_distance)
                             .unwrap_or(std::cmp::Ordering::Equal)
@@ -185,8 +187,10 @@ impl<P: Problem> Evolution<P> {
 
             if let Some(ref true_f) = self.true_front {
                 igd_history.push(igd(true_f, &current_objectives));
+                gd_history.push(generational_distance(true_f, &current_objectives));
             } else {
                 igd_history.push(f64::NAN);
+                gd_history.push(f64::NAN);
             }
 
             history.push(front_snapshot);
@@ -210,6 +214,7 @@ impl<P: Problem> Evolution<P> {
             history,
             hypervolume_history,
             igd_history,
+            gd_history,
             generations_completed,
         }
     }
