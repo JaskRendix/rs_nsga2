@@ -1,6 +1,6 @@
 # NSGA‑II Rust Core
 
-A Rust implementation of the NSGA‑II multi‑objective evolutionary algorithm.  
+A Rust implementation of the NSGA‑II multi‑objective evolutionary algorithm, based on the [NSGA-II Python Implementation](https://github.com/baopng/NSGA-II).  
 The crate provides the core components required to build deterministic or stochastic evolutionary workflows.
 
 ---
@@ -14,7 +14,7 @@ The crate provides the core components required to build deterministic or stocha
 - tournament selection
 - constraint handling
 - strict and auto hypervolume
-- IGD (Inverted Generational Distance)
+- IGD (Inverted Generational Distance) and GD (Generational Distance)
 - per‑generation Pareto snapshots
 - early stopping
 - reproducible runs via optional RNG seeding
@@ -30,11 +30,11 @@ The `problem` module is now split into a directory:
 
 ```
 src/problem/
-    problem_trait.rs   — core Problem trait
-    schaffer.rs        — Schaffer N.1
-    zdt.rs             — ZDT1, ZDT2, ZDT3
-    dtlz.rs            — DTLZ1, DTLZ2, DTLZ3
-    kursawe.rs         — Kursawe
+problem_trait.rs   — core Problem trait
+schaffer.rs        — Schaffer N.1
+zdt.rs             — ZDT1, ZDT2, ZDT3
+dtlz.rs            — DTLZ1, DTLZ2, DTLZ3
+kursawe.rs         — Kursawe
 ```
 
 All built‑in problems implement the same `Problem` trait and are re‑exported through `problem::`.
@@ -44,7 +44,7 @@ Other modules:
 - `evolve` — NSGA‑II engine and `RunResult`
 - `sort` — non‑dominated sorting and crowding distance
 - `data` — individuals, dominance logic, feasibility rules
-- `metrics` — strict HV, auto HV, IGD
+- `metrics` — strict HV, auto HV, IGD, GD
 
 All tests for Schaffer, ZDT, DTLZ, and Kursawe pass.
 
@@ -204,18 +204,18 @@ fn main() {
 
 ### Non‑dominated sorting
 
-- tri‑state dominance (`IDominatesJ`, `JDominatesI`, `None`)
-- parallel dominance matrix
-- sequential front extraction
-- feasibility rules:
-  - feasible dominates infeasible
-  - among infeasible: lower total violation dominates
+* tri‑state dominance (`IDominatesJ`, `JDominatesI`, `None`)
+* parallel dominance matrix
+* sequential front extraction
+* feasibility rules:
+* feasible dominates infeasible
+* among infeasible: lower total violation dominates
 
 ### Crowding distance
 
-- stable, NaN‑safe sorting per objective  
-- infinite distance for boundary individuals  
-- finite‑difference distance for interior individuals  
+* stable, NaN‑safe sorting per objective
+* infinite distance for boundary individuals
+* finite‑difference distance for interior individuals
 
 ---
 
@@ -245,21 +245,30 @@ use rs_nsga2::metrics::igd;
 
 Computes the average distance from the true front to the obtained front.
 
+### GD
+
+```rust
+use rs_nsga2::metrics::generational_distance;
+```
+
+Computes the average distance from the obtained front to the true front.
+
 ---
 
 ## Algorithm
 
 Each generation:
 
-1. tournament selection  
-2. SBX crossover  
-3. polynomial mutation  
-4. parallel objective evaluation  
-5. merge parents and offspring  
-6. non‑dominated sorting  
-7. crowding‑distance truncation  
+1. tournament selection
+2. SBX crossover
+3. polynomial mutation
+4. parallel objective evaluation
+5. merge parents and offspring
+6. non‑dominated sorting
+7. crowding‑distance truncation
 
-Feasible solutions dominate infeasible ones.  
+Feasible solutions dominate infeasible ones.
+
 Among infeasible solutions, lower total violation dominates.
 
 ---
@@ -267,11 +276,12 @@ Among infeasible solutions, lower total violation dominates.
 ## RunResult
 
 | Field | Description |
-|-------|-------------|
+| --- | --- |
 | `pareto_front` | final Pareto front |
 | `history` | per‑generation Pareto snapshots |
 | `hypervolume_history` | HV per generation (`NaN` if no reference point) |
 | `igd_history` | IGD per generation (`NaN` if no true front) |
+| `gd_history` | GD per generation (`NaN` if no true front) |
 | `generations_completed` | number of executed generations |
 
 ---
@@ -280,10 +290,10 @@ Among infeasible solutions, lower total violation dominates.
 
 Included benchmarks:
 
-- full NSGA‑II loop  
-- sorting only  
-- strict vs auto hypervolume  
-- IGD microbench  
+* full NSGA‑II loop
+* sorting only
+* strict vs auto hypervolume
+* IGD and GD microbenchs
 
 Run all:
 
@@ -300,16 +310,3 @@ cargo bench --bench evolution
 ```
 
 Reports are written to `target/criterion/`.
-
----
-
-## Original authors (Python version)
-
-- Pham Ngo Gia Bao  
-- Tram Loi Quan  
-- Quan Thanh Tho  
-- Akhil Garg  
-
-## Rust port
-
-- Giorgio
